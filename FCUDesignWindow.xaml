@@ -1,0 +1,91 @@
+<Window x:Class="FCUAutoDesign.FCUDesignWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FCU BIM 智能布设与下翻绕管设计台" 
+        Height="540" Width="440"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#0f172a" Foreground="#f8fafc"
+        FontFamily="Microsoft YaHei">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题区 -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="FCU 智能排布与管线避让控制台" FontSize="16" FontWeight="Bold" Foreground="#38bdf8"/>
+            <TextBlock Text="主管打断防假成功 | 参数全接通 | 标高基准防线" FontSize="11" Foreground="#94a3b8" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <!-- 参数表单 -->
+        <Border Grid.Row="1" Background="#1e293b" CornerRadius="8" Padding="14" BorderBrush="#334155" BorderThickness="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="100"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="进门过道内缩 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBox x:Name="TxtDoorOffset" Grid.Column="1" Text="800" Background="#0f172a" Foreground="#38bdf8" BorderBrush="#475569" Padding="4"/>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="100"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="风盘相对标高净高 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBox x:Name="TxtFcuElevation" Grid.Column="1" Text="2600" Background="#0f172a" Foreground="#38bdf8" BorderBrush="#475569" Padding="4"/>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="100"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="阀门检修预留段 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBox x:Name="TxtValveClearance" Grid.Column="1" Text="400" Background="#0f172a" Foreground="#34d399" BorderBrush="#475569" Padding="4"/>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="100"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="向下翻弯避让高差 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBox x:Name="TxtFlipDrop" Grid.Column="1" Text="150" Background="#0f172a" Foreground="#f43f5e" BorderBrush="#475569" Padding="4"/>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="100"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="冷凝水管坡度 (%):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBox x:Name="TxtCondensateSlope" Grid.Column="1" Text="0.8" Background="#0f172a" Foreground="#fbbf24" BorderBrush="#475569" Padding="4"/>
+                    </Grid>
+
+                    <!-- 功能控制开关 (已修复 XAML 转义与参数接通) -->
+                    <Border BorderBrush="#334155" BorderThickness="0,1,0,0" Margin="0,6,0,8" Padding="0,6,0,0">
+                        <StackPanel>
+                            <CheckBox x:Name="ChkAutoDn" Content="启用房间面积与水力负荷动态选型 (&lt;25㎡: DN20, ≥25㎡: DN25)" IsChecked="True" Foreground="#93c5fd" Margin="0,3,0,0" FontSize="11"/>
+                            <CheckBox x:Name="ChkEnableReturn" Content="连接走廊回水主管 (双管对称下翻与打断并网)" IsChecked="True" Foreground="#c084fc" Margin="0,6,0,0" FontSize="11"/>
+                            <CheckBox x:Name="ChkEnableCondensate" Content="生成 0.8% 坡度冷凝水重力排水管" IsChecked="True" Foreground="#fcd34d" Margin="0,6,0,0" FontSize="11"/>
+                            <CheckBox x:Name="ChkBreakCurve" Content="打断主管并插入三通 (带 SubTransaction 安全回滚保护)" IsChecked="True" Foreground="#86efac" Margin="0,6,0,0" FontSize="11"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- 底部触发按钮 -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button x:Name="BtnCancel" Content="取消" Width="80" Height="32" Margin="0,0,10,0" Background="#334155" Foreground="#e2e8f0" BorderThickness="0" Click="BtnCancel_Click"/>
+            <Button x:Name="BtnRun" Content="确认参数并开始拾取" Width="150" Height="32" Background="#0284c7" Foreground="White" FontWeight="Bold" BorderThickness="0" Click="BtnRun_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

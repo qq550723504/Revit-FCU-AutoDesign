@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <!-- 
+    Revit 2022 插件注册清单文件
+    放置路径: %AppData%\Autodesk\Revit\Addins\2022\FCUAutoDesign.addin
+  -->
+  <AddIn Type="Command">
+    <Name>FCU PoC Tool - 智能排布与下翻避让</Name>
+    <Assembly>C:\Users\Henry\code\FCUAutoDesign\bin\Debug\FCUAutoDesign.dll</Assembly>
+    <FullClassName>FCUAutoDesign.CmdPlaceFCUAndConnect</FullClassName>
+    <ClientId>B8E5F72A-26E4-4D2A-9467-3A2F9B8A7E11</ClientId>
+    <VendorId>MyCompany</VendorId>
+    <VendorDescription>FCU BIM Auto-design PoC (Local Dev)</VendorDescription>
+  </AddIn>
+</RevitAddIns>

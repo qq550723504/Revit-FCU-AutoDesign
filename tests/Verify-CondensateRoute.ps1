@@ -58,6 +58,24 @@ namespace FCUAutoDesign
             var bentStraight = CondensateRoutePlanner.Plan(start,dir,P(3,-5,8),P(3,5,8),.4,.01,.2);
             Check(bentStraight.Length == 3, "Collinear plan retains bend when avoiding another circuit");
             Reject(() => CondensateRoutePlanner.Plan(start,dir,a,b,.4,.01,double.NaN), "无效", "Nonfinite detour rejected");
+            foreach (double shift in new double[] { -.6, -.4, -.2, .2, .4, .6 })
+            {
+                var detour = CondensateRoutePlanner.Plan(start,dir,a,b,.15,.01,shift,true);
+                Check(detour.Length == 5 && detour[1].Z == start.Z
+                    && Math.Abs(detour[2].Z-start.Z-shift) < 1e-8
+                    && detour[2].Z == detour[3].Z && detour[4].Z == 8,
+                    "Orthogonal detour preserves horizontal outlet and independent crossing elevation");
+                bool perpendicular = true;
+                for (int i=1; i<detour.Length-1; i++)
+                    perpendicular &= Math.Abs(Vector3D.DotProduct(detour[i]-detour[i-1],detour[i+1]-detour[i])) < 1e-8;
+                Check(perpendicular, "Detour bends are perpendicular");
+            }
+            var raised = CondensateRoutePlanner.Plan(start,dir,P(-5,3,11),P(5,3,11),.15,.01,.2,true);
+            Check(raised[raised.Length-1].Z == 11, "Detour allows higher main without slope restriction");
+            var coincident = CondensateRoutePlanner.Plan(start,dir,a,b,.15,.01,-2,true);
+            Check(coincident.Length == 4, "Same elevation join omits zero length final segment");
+            Reject(() => CondensateRoutePlanner.Plan(start,dir,a,b,.15,.01,0,true), "过短", "Zero detour rejected");
+            Reject(() => CondensateRoutePlanner.Plan(start,dir,a,b,.15,.01,-1.995,true), "过短", "Short final riser rejected");
             System.Console.WriteLine(count + " geometry checks passed. Revit fitting and rollback tests are NOT_RUN.");
         }
     }

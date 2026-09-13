@@ -1,4 +1,4 @@
-﻿param([string]$AssemblyPath = (Join-Path $PSScriptRoot '..\bin\ThreeCircuitSeparation\FCUAutoDesign.dll'))
+﻿param([string]$AssemblyPath = (Join-Path $PSScriptRoot '..\bin\CondensateOrthogonalDetour\FCUAutoDesign.dll'))
 
 # In-process WPF regression test; does not automate or modify a running Revit instance.
 # Run with Windows PowerShell: powershell.exe -NoProfile -STA -File tests\Verify-Dialog.ps1

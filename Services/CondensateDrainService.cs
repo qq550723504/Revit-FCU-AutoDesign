@@ -15,12 +15,15 @@ namespace FCUAutoDesign
         // 支管、弯头、主管打断和三通属于同一子事务；失败时不保留局部残管。
         public CondensateDrainResult ConnectToMain(Document doc, Connector drainConn, Pipe mainPipe,
             ElementId levelId, double dia,
-            RollBackOnErrorPreprocessor failureReporter, double leadLength, double bendOffset)
+            RollBackOnErrorPreprocessor failureReporter, double leadLength, double bendOffset, MainPipeRun run = null,
+            bool orthogonalDetour = false)
         {
             using (SubTransaction transaction = new SubTransaction(doc))
             {
                 try
                 {
+                    if (run != null && drainConn != null)
+                        mainPipe = run.Resolve(doc, drainConn.Origin + drainConn.CoordinateSystem.BasisZ * leadLength);
                     if (mainPipe == null) throw new InvalidOperationException("未选择冷凝水主管。");
                     PipeType pipeType = mainPipe.PipeType;
                     if (pipeType == null) throw new InvalidOperationException("所选冷凝水主管没有有效管型。");
@@ -47,7 +50,7 @@ namespace FCUAutoDesign
                     Point3D[] plan = CondensateRoutePlanner.Plan(Point(start),
                         new Vector3D(direction.X, direction.Y, direction.Z),
                         Point(mainLine.GetEndPoint(0)), Point(mainLine.GetEndPoint(1)),
-                        leadLength, minLength, bendOffset);
+                        leadLength, minLength, bendOffset, orthogonalDetour);
                     XYZ[] points = plan.Select(p => new XYZ(p.X, p.Y, p.Z)).ToArray();
                     XYZ join = points[points.Length - 1];
                     CondensateDrainResult result = new CondensateDrainResult { MinLength = minLength };

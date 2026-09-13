@@ -14,7 +14,8 @@ namespace FCUAutoDesign
         // 保留供水，逐个尝试回水预留段/下翻高度；失败候选完整回滚后才能尝试下一条。
         public TeeConnectionResult ConnectReturn(Document doc, Connector connector, Pipe main,
             double diameter, double drop, double lead, bool enableTee,
-            RollBackOnErrorPreprocessor reporter, TeeConnectionResult supply)
+            RollBackOnErrorPreprocessor reporter, TeeConnectionResult supply,
+            MainPipeRun run = null, RoomBatchContext batch = null, string circuit = "回水")
         {
             string lastReason = "没有可用路线";
             ElementId mainId = main.Id;
@@ -34,15 +35,16 @@ namespace FCUAutoDesign
                         {
                             TeeConnectionResult result = hydronic.ConnectWithLowerFlipAndTee(doc,
                                 connector, main, diameter, drop + dropStep * step,
-                                lead + leadStep * step, enableTee, "回水", reporter);
+                                lead + leadStep * step, enableTee, circuit, reporter, run);
                             if (!result.BranchCreated || (enableTee && !result.TeeCreated))
                                 throw new InvalidOperationException(result.ErrorMessage ?? "回水连接未完成。");
                             doc.Regenerate();
                             Verify(doc, supply, result);
+                            batch?.VerifyNew(doc, result);
                             if (candidate.Commit() != TransactionStatus.Committed)
                                 throw new InvalidOperationException("回水避让候选未成功提交。");
                             if (leadStep != 0 || dropStep != 0)
-                                result.ErrorMessage = $"为避开供水，回水预留段采用 {(lead + leadStep * step) * FEET_TO_MM:F0} mm，"
+                                result.ErrorMessage = $"为完成避让接入，{circuit}预留段采用 {(lead + leadStep * step) * FEET_TO_MM:F0} mm，"
                                     + $"下翻高度采用 {(drop + dropStep * step) * FEET_TO_MM:F0} mm。"
                                     + (enableTee ? "" : "未启用主管三通接入。");
                             return result;
@@ -68,7 +70,7 @@ namespace FCUAutoDesign
                         .Single(c => c.Id == connectorId);
                 }
             }
-            throw new InvalidOperationException("在限定的 25 条回水候选路线内未找到可接入且不与供水相交的方案。"
+            throw new InvalidOperationException($"在限定的 25 条{circuit}候选路线内未找到可接入且不与已生成管线相交的方案。"
                 + "已取消本次操作，请调整设备位置、主管或路径参数。最后原因：" + lastReason);
         }
 

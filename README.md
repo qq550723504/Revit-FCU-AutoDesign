@@ -78,6 +78,8 @@ msbuild FCUAutoDesign.csproj /p:RevitVersion=2022 /p:RevitInstallPath="C:\Progra
 
 本项目仅供内部开发与学习使用，具体使用范围请遵循项目所属团队或组织的授权要求。
 
-当前 Debug 输出和本机 Revit 注册路径统一为 `bin/ThreeCircuitSeparation/FCUAutoDesign.dll`（旧 Debug DLL 被运行中的 Revit 占用）。修改后需重启 Revit 才能加载新版。
+当前 Debug 输出和本机 Revit 注册路径统一为 `bin/MultiRoom/FCUAutoDesign.dll`（旧 Debug DLL 被运行中的 Revit 占用）。修改后需重启 Revit 才能加载新版。
 
 `CondensateSeparationService` 负责冷凝水候选重试；`CircuitInterferenceVerifier` 统一检查回路间管道与管件实体相交。
+
+批量入口：`FcuBatchService` 按房间隔离事务；`RoomBatchContext` 管理已提交回路；`MainPipeRun` 跟踪主管分段；`BatchReportPresenter` 汇总逐房间结果。首版仅支持同楼层、单门房间及共用所选主管。

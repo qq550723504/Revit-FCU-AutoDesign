@@ -19,8 +19,10 @@ namespace FCUAutoDesign
             double valveClearance,
             bool enableTeeFitting,
             string circuit,
-            RollBackOnErrorPreprocessor failureReporter)
+            RollBackOnErrorPreprocessor failureReporter, MainPipeRun run = null)
         {
+            if (run != null)
+                mainPipe = run.Resolve(doc, fcuConn.Origin + fcuConn.CoordinateSystem.BasisZ * valveClearance);
             failureReporter.ElementRoles[mainPipe.Id.IntegerValue] = circuit + "主管";
             TeeConnectionResult result = new TeeConnectionResult();
             ElementId pipeTypeId = mainPipe.PipeType.Id;

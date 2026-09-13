@@ -23,7 +23,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\ThreeCircuitSeparation\</OutputPath>
+    <OutputPath>bin\CondensateOrthogonalDetour\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -85,7 +85,13 @@
     <Compile Include="Services\CondensateSystemPolicy.cs" />
     <Compile Include="Models\CondensateDrainResult.cs" />
     <Compile Include="Geometry\CondensateRoutePlanner.cs" />
+    <Compile Include="Geometry\MainPipeSegmentLocator.cs" />
     <Compile Include="Services\FcuDesignService.cs" />
+    <Compile Include="Services\MainPipeRun.cs" />
+    <Compile Include="Services\RoomBatchContext.cs" />
+    <Compile Include="Services\FcuBatchService.cs" />
+    <Compile Include="Models\RoomExecutionResult.cs" />
+    <Compile Include="Presentation\BatchReportPresenter.cs" />
     <Compile Include="Presentation\ExecutionReportPresenter.cs" />
     <Compile Include="Presentation\CondensateMainPicker.cs" />
     <Compile Include="FCUDesignWindow.xaml.cs">

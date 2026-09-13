@@ -8,11 +8,11 @@ namespace FCUAutoDesign
     internal static class CircuitInterferenceVerifier
     {
         public static void Verify(Document doc, TeeConnectionResult first, TeeConnectionResult second,
-            string firstName, string secondName)
+            string firstName, string secondName, bool includeMains = true)
         {
             if (first == null || second == null || !first.BranchCreated || !second.BranchCreated) return;
-            List<ElementId> firstIds = Elements(first);
-            List<ElementId> secondIds = Elements(second);
+            List<ElementId> firstIds = Elements(first, includeMains);
+            List<ElementId> secondIds = Elements(second, includeMains);
             foreach (ElementId id in firstIds.Concat(secondIds))
             {
                 Element element = doc.GetElement(id);
@@ -31,14 +31,17 @@ namespace FCUAutoDesign
             }
         }
 
-        private static List<ElementId> Elements(TeeConnectionResult result)
+        private static List<ElementId> Elements(TeeConnectionResult result, bool includeMains)
         {
             // 排除共享 FCU，包含管道、弯头、三通和自动过渡管件。
             List<ElementId> ids = result.Chain.Skip(1).ToList();
             if (result.TeeCreated)
             {
-                ids.Add(result.MainPart1Id);
-                ids.Add(result.MainPart2Id);
+                if (includeMains)
+                {
+                    ids.Add(result.MainPart1Id);
+                    ids.Add(result.MainPart2Id);
+                }
                 if (result.MainPart1AdapterId != null) ids.Add(result.MainPart1AdapterId);
                 if (result.MainPart2AdapterId != null) ids.Add(result.MainPart2AdapterId);
             }

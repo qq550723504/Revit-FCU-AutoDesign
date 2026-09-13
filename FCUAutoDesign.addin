@@ -7,7 +7,7 @@
   <AddIn Type="Command">
     <Name>FCU PoC Tool - 智能排布与下翻避让</Name>
     <Text>FCU 放置与接管 PoC</Text>
-    <Assembly>C:\Users\Henry\code\FCUAutoDesign\bin\ThreeCircuitSeparation\FCUAutoDesign.dll</Assembly>
+    <Assembly>C:\Users\Henry\code\FCUAutoDesign\bin\CondensateOrthogonalDetour\FCUAutoDesign.dll</Assembly>
     <FullClassName>FCUAutoDesign.CmdPlaceFCUAndConnect</FullClassName>
     <AddInId>B8E5F72A-26E4-4D2A-9467-3A2F9B8A7E11</AddInId>
     <VisibilityMode>NotVisibleInFamily</VisibilityMode>

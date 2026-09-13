@@ -1,7 +1,7 @@
 ﻿<Window x:Class="FCUAutoDesign.FCUDesignWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FCU 放置与固定路径接管 PoC"
+        Title="FCU 同楼层多房间放置与接管 PoC"
         Height="610" Width="440"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -16,7 +16,7 @@
 
         <!-- 标题区 -->
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
-            <TextBlock Text="FCU 放置与接管验证" FontSize="16" FontWeight="Bold" Foreground="#38bdf8"/>
+            <TextBlock Text="FCU 同楼层多房间布置" FontSize="16" FontWeight="Bold" Foreground="#38bdf8"/>
             <TextBlock Text="验证模型位置与连接关系；不含水力计算和碰撞检查" FontSize="11" Foreground="#94a3b8" Margin="0,4,0,0"/>
         </StackPanel>
 
@@ -84,7 +84,7 @@
         <!-- 底部触发按钮 -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
             <Button x:Name="BtnCancel" Content="取消" Width="80" Height="32" Margin="0,0,10,0" Background="#334155" Foreground="#e2e8f0" BorderThickness="0" Click="BtnCancel_Click"/>
-            <Button x:Name="BtnRun" Content="确认参数并开始拾取" Width="150" Height="32" Background="#0284c7" Foreground="White" FontWeight="Bold" BorderThickness="0" Click="BtnRun_Click"/>
+            <Button x:Name="BtnRun" Content="确认参数并选择房间" Width="150" Height="32" Background="#0284c7" Foreground="White" FontWeight="Bold" BorderThickness="0" Click="BtnRun_Click"/>
         </StackPanel>
     </Grid>
 </Window>

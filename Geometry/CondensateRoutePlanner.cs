@@ -8,7 +8,8 @@ namespace FCUAutoDesign
     internal static class CondensateRoutePlanner
     {
         public static Point3D[] Plan(Point3D start, Vector3D outward,
-            Point3D mainStart, Point3D mainEnd, double leadLength, double minLength, double bendOffset = 0)
+            Point3D mainStart, Point3D mainEnd, double leadLength, double minLength, double bendOffset = 0,
+            bool orthogonalDetour = false)
         {
             if (!Finite(bendOffset) || !Finite(leadLength) || !Finite(minLength) || minLength <= 0 || leadLength <= minLength)
                 throw new InvalidOperationException("冷凝水预留长度无效。");
@@ -33,8 +34,21 @@ namespace FCUAutoDesign
                 throw new InvalidOperationException("冷凝水横向接近段过短，无法容纳弯头，请调整设备位置或所选主管。");
             cross.Normalize();
             double alignment = Vector3D.DotProduct(outward, cross);
-            if (alignment < -1 + 1e-6)
+            if (!orthogonalDetour && alignment < -1 + 1e-6)
                 throw new InvalidOperationException("冷凝水路线需要原路折返，请调整设备出管方向或所选主管。");
+            if (orthogonalDetour)
+            {
+                // 保持设备端水平出管，在独立标高横移，再竖直接入主管；不限制高差方向。
+                lead.Z = start.Z;
+                Point3D raisedLead = new Point3D(lead.X, lead.Y, start.Z + bendOffset);
+                Point3D raisedJoin = new Point3D(join.X, join.Y, raisedLead.Z);
+                List<Point3D> detour = new List<Point3D> { start, lead, raisedLead, raisedJoin };
+                if ((join - raisedJoin).Length > 1e-9) detour.Add(join);
+                for (int i = 1; i < detour.Count; i++)
+                    if ((detour[i] - detour[i - 1]).Length <= minLength)
+                        throw new InvalidOperationException("冷凝水错层路线包含过短管段。");
+                return detour.ToArray();
+            }
             double drop = start.Z - join.Z;
             // 不输入或指定坡度；把实际高差分配到平面路径上，同标高时保持水平。
             lead.Z = start.Z - drop * leadLength / (leadLength + crossLength) + bendOffset;

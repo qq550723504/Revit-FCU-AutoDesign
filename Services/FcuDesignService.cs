@@ -10,14 +10,13 @@ namespace FCUAutoDesign
     {
         private readonly FcuPlacementService placement = new FcuPlacementService();
         private readonly FcuConnectorResolver connectors = new FcuConnectorResolver();
-        private readonly HydronicConnectionService hydronic = new HydronicConnectionService();
         private readonly HydronicSeparationService separation = new HydronicSeparationService();
         private readonly CondensateSeparationService condensate = new CondensateSeparationService();
         private readonly ConnectionChainVerifier verifier = new ConnectionChainVerifier();
 
         // 唯一的主事务/事务组所有者；提交后的验证失败仍回滚整个事务组。
         public FcuDesignResult Execute(Document doc, Room room, Pipe supplyMainPipe,
-            Pipe returnMainPipe, Pipe condensateMainPipe, FcuDesignOptions options)
+            Pipe returnMainPipe, Pipe condensateMainPipe, FcuDesignOptions options, RoomBatchContext batch = null)
         {
             double roomAreaSqm = room.Area * SQFT_TO_SQM;
             double coolingLoadKw = roomAreaSqm * 0.160; // 160 W/m² 指标估算
@@ -79,14 +78,14 @@ namespace FCUAutoDesign
                     // 步骤 C: 供水支管下翻避让并接入主管（含 SubTransaction 保护）
                     if (conns.SupplyConnector != null && supplyMainPipe != null)
                     {
-                        TeeConnectionResult supplyRes = hydronic.ConnectWithLowerFlipAndTee(
+                        TeeConnectionResult supplyRes = separation.ConnectReturn(
                             doc,
                             conns.SupplyConnector,
                             supplyMainPipe,
                             branchDiameterFeet,
                             options.FlipDropMm * MM_TO_FEET,
                             options.ValveClearanceMm * MM_TO_FEET,
-                            options.BreakCurveAndTee, "供水", failureReporter
+                            options.BreakCurveAndTee, failureReporter, null, batch?.Supply, batch, "供水"
                         );
                         outcome.SupplyBranchCreated = supplyRes.BranchCreated;
                         outcome.SupplyTeeConnected = supplyRes.TeeCreated;
@@ -97,6 +96,8 @@ namespace FCUAutoDesign
                         }
                     }
 
+                    // 供水候选可能回滚；重新读取回水接口。
+                    conns = connectors.DetectFCUConnectors(doc.GetElement(outcome.FcuId) as FamilyInstance, condensateType);
                     // 步骤 D: 回水支管下翻避让并接入回水主管
                     if (options.EnableReturnPipe && returnMainPipe != null && conns.ReturnConnector != null)
                     {
@@ -107,7 +108,7 @@ namespace FCUAutoDesign
                             branchDiameterFeet,
                             options.FlipDropMm * MM_TO_FEET,
                             options.ValveClearanceMm * MM_TO_FEET,
-                            options.BreakCurveAndTee, failureReporter, supplyResult
+                            options.BreakCurveAndTee, failureReporter, supplyResult, batch?.Return, batch
                         );
                         outcome.ReturnBranchCreated = returnRes.BranchCreated;
                         outcome.ReturnTeeConnected = returnRes.TeeCreated;
@@ -126,7 +127,7 @@ namespace FCUAutoDesign
                         drainResult = condensate.Connect(
                             doc, conns.CondensateConnector, condensateMainPipe, room.Level.Id,
                             20 * MM_TO_FEET,
-                            failureReporter, supplyResult, returnResult);
+                            failureReporter, supplyResult, returnResult, batch?.Condensate, batch);
                         outcome.CondensateConnected = drainResult.Connected;
                         if (!string.IsNullOrEmpty(drainResult.ErrorMessage))
                             outcome.Warnings.Add("冷凝水管: " + drainResult.ErrorMessage);
@@ -157,6 +158,7 @@ namespace FCUAutoDesign
                     throw new InvalidOperationException("提交后位置或连接链复核失败，已回滚整次 PoC 操作。");
                 condensate.Verify(doc, drainResult, supplyResult, returnResult);
                 separation.Verify(doc, supplyResult, returnResult);
+                batch?.VerifyPrevious(doc, supplyResult, returnResult, drainResult?.Connected == true ? drainResult.Connection : null);
                 if (group.Assimilate() != TransactionStatus.Committed)
                     throw new InvalidOperationException("PoC 事务组未成功提交。");
             }
@@ -164,7 +166,9 @@ namespace FCUAutoDesign
             return new FcuDesignResult
             {
                 Outcome = outcome, RoomAreaSqm = roomAreaSqm,
-                CoolingLoadKw = coolingLoadKw, ActualDn = actualDn
+                CoolingLoadKw = coolingLoadKw, ActualDn = actualDn,
+                SupplyConnection = supplyResult, ReturnConnection = returnResult,
+                DrainConnection = drainResult?.Connected == true ? drainResult.Connection : null
             };
         }
     }

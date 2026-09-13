@@ -67,9 +67,12 @@ namespace FCUAutoDesign
                 // 1. 引导用户拾取目标房间与走廊供水水平主管
                 // =========================================================================
                 int totalSteps = 2 + (options.EnableReturnPipe ? 1 : 0) + (options.EnableCondensate ? 1 : 0);
-                Reference roomRef = uidoc.Selection.PickObject(ObjectType.Element, new RoomFilter(), $"【步骤 1/{totalSteps}】请选择需要布置风机盘管的房间 (Room)");
-                Room room = doc.GetElement(roomRef) as Room;
-                if (room == null) return Result.Cancelled;
+                IList<Reference> roomRefs = uidoc.Selection.PickObjects(ObjectType.Element, new RoomFilter(),
+                    $"【步骤 1/{totalSteps}】请选择同楼层房间，选完点击“完成”（每间须为单门房间）");
+                List<Room> rooms = roomRefs.Select(r => doc.GetElement(r) as Room)
+                    .Where(r => r != null).GroupBy(r => r.Id.IntegerValue).Select(g => g.First()).ToList();
+                if (rooms.Count == 0) return Result.Cancelled;
+                FcuBatchService.ValidateRooms(rooms);
 
                 Reference supplyRef = uidoc.Selection.PickObject(ObjectType.Element, new PipeFilter(MEPSystemClassification.SupplyHydronic), $"【步骤 2/{totalSteps}】请选择供水水平主管（仅接受 SupplyHydronic 系统分类）");
                 Pipe supplyMainPipe = doc.GetElement(supplyRef) as Pipe;
@@ -100,13 +103,13 @@ namespace FCUAutoDesign
                     if (condensateMainPipe == null) return Result.Cancelled;
                 }
 
-                FcuDesignResult result = new FcuDesignService().Execute(doc, room, supplyMainPipe,
-                    returnMainPipe, condensateMainPipe, options);
-                new ExecutionReportPresenter().ShowHonestReport(result.Outcome, result.RoomAreaSqm,
-                    result.CoolingLoadKw, result.ActualDn, options.EnableAutoSizing,
-                    options.EnableReturnPipe, returnMainPipe != null);
-
-                return Result.Succeeded;
+                List<RoomExecutionResult> results = new FcuBatchService().Execute(doc, rooms,
+                    supplyMainPipe, returnMainPipe, condensateMainPipe, options);
+                new BatchReportPresenter().Show(results, options);
+                // 部分房间失败不能以命令级 Failed 撤销已提交的其他房间。
+                if (results.Any(r => r.Design != null)) return Result.Succeeded;
+                message = "本批次没有房间完成布置，请查看各房间失败原因。";
+                return Result.Failed;
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)
             {

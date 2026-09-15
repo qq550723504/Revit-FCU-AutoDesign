@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Windows;
 
 namespace FCUAutoDesign
@@ -9,12 +10,18 @@ namespace FCUAutoDesign
         public double FcuElevationMm { get; private set; } = 2600;
         public double ValveClearanceMm { get; private set; } = 400;
         public double FlipDropMm { get; private set; } = 150;
-        public double CondensateSlope { get; private set; } = 0.008;
         public bool EnableAutoSizing { get; private set; } = true;
         public bool EnableReturnPipe { get; private set; } = true;
-        public bool EnableCondensate { get; private set; } = true;
+        public bool EnableCondensate { get; private set; } = false;
         public bool BreakCurveAndTee { get; private set; } = true;
         public bool IsConfirmed { get; private set; } = false;
+        public int? SelectedFcuTypeId => FcuTypePicker.SelectedValue as int?;
+
+        public void SetFcuTypes(IList<KeyValuePair<int, string>> types)
+        {
+            FcuTypePicker.ItemsSource = types;
+            FcuTypePicker.SelectedIndex = types.Count == 1 ? 0 : -1;
+        }
 
         public FCUDesignWindow()
         {
@@ -23,11 +30,11 @@ namespace FCUAutoDesign
 
         private void BtnRun_Click(object sender, RoutedEventArgs e)
         {
-            if (double.TryParse(TxtDoorOffset.Text, out double dOffset)) DoorOffsetMm = dOffset;
-            if (double.TryParse(TxtFcuElevation.Text, out double fElev)) FcuElevationMm = fElev;
-            if (double.TryParse(TxtValveClearance.Text, out double vClear)) ValveClearanceMm = vClear;
-            if (double.TryParse(TxtFlipDrop.Text, out double fDrop)) FlipDropMm = fDrop;
-            if (double.TryParse(TxtCondensateSlope.Text, out double slope)) CondensateSlope = slope / 100.0;
+            if (!TryReadParameters())
+            {
+                MessageBox.Show(this, "请选择 FCU 类型。距离和高度必须是有限的正数。", "参数无效");
+                return;
+            }
 
             EnableAutoSizing = ChkAutoDn.IsChecked == true;
             EnableReturnPipe = ChkEnableReturn.IsChecked == true;
@@ -35,13 +42,34 @@ namespace FCUAutoDesign
             BreakCurveAndTee = ChkBreakCurve.IsChecked == true;
 
             IsConfirmed = true;
-            this.Close();
+            DialogResult = true;
+        }
+
+        private bool TryReadParameters()
+        {
+            double dOffset, fElev, vClear, fDrop;
+            if (!SelectedFcuTypeId.HasValue) return false;
+            if (!TryPositive(TxtDoorOffset.Text, out dOffset)
+                || !TryPositive(TxtFcuElevation.Text, out fElev)
+                || !TryPositive(TxtValveClearance.Text, out vClear)
+                || !TryPositive(TxtFlipDrop.Text, out fDrop)) return false;
+            DoorOffsetMm = dOffset;
+            FcuElevationMm = fElev;
+            ValveClearanceMm = vClear;
+            FlipDropMm = fDrop;
+            return true;
+        }
+
+        private static bool TryPositive(string value, out double number)
+        {
+            return double.TryParse(value, out number) && !double.IsNaN(number)
+                && !double.IsInfinity(number) && number > 0;
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
             IsConfirmed = false;
-            this.Close();
+            DialogResult = false;
         }
     }
 }

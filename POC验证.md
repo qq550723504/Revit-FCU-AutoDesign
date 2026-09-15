@@ -212,3 +212,19 @@ powershell -NoProfile -STA -ExecutionPolicy Bypass -File tests\Verify-Dialog.ps1
 ```
 
 真实输出：Rebuild Exit 0；16 clearance checks passed；21 outlet obstacle checks passed；32 checks passed / 3132 active route candidates validated；23 checks passed。实际单房间运行耗时、日志模型数据、试建上限与回滚的 Revit 验证仍为 NOT_RUN。
+
+## 首房间诊断实测结果（运行程序集 5ec1e75）
+
+读取本地日志 `route-20260915-150703-2a20ce4cce20412d8ed6d0fdd23047aa.txt` 和 `route-20260915-150738-493ca8b8a62141cc9ee08df5b01705a1.txt`。两次运行 MVID 均为 `c1eaeb1f-80e2-4451-9e37-ba017f82e617`，FCU ID 分别为 575792、576003。两次均生成 252/189/126 mm 提前转弯候选，首条 252 mm、下翻 150 mm、横移 0 即通过，预筛 1、跳过 0、试建 1。
+
+后一份日志：5 ms 开始试建，122 ms 接管返回，123 ms 验证通过；前一份到验证通过为 200 ms。这仅计冷凝水阶段，不能作为整房间或批量耗时。用户后一张结果截图显示会议室 1（房间 ID 561856）供水、回水、冷凝水均已接主管，最终为连接完成；第二间按单房间诊断规则未执行。
+
+现场几何确认原候选被清空的原因：供水水平段包围盒在冷凝水出管方向的范围为 0～362 mm，垂直相对高差 63.25～96.75 mm，落入原候选扩展范围而产生负可用长度。供水首弯头前缘为 362 mm，扣除半径 10 mm 和搜索余量 100 mm 得到 252 mm；修正后这个正长度建议得以保留。
+
+将上述局部几何移至冷凝水接口原点并转换出管方向后加入 `tests/Verify-OutletLead.ps1`，不提交客户绝对坐标或完整模型日志。命令 `powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-OutletLead.ps1` 真实输出 `24 outlet obstacle checks passed`；新增三项复现实际候选长度、相邻供水水平段和提前转弯折线。
+
+- PASS（用户截图及本地日志）：该首房间连接完成、一次冷凝水试建、阶段计时输出、后续房间未执行。
+- PASS（自动化）：实际局部几何回归。
+- NOT_RUN：恢复批量后的多房间连接与总耗时、失败预算触发与回滚复核、工程排水工况及人工净距验收。
+
+本次仅记录证据并增加回归，运行程序集仍为 5ec1e75；未解除单房间诊断限制。

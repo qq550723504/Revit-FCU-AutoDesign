@@ -93,6 +93,22 @@ namespace FCUAutoDesign
                 Check(rotated.Length==leads.Length && rotated.Zip(leads,(a,b)=>Math.Abs(a-b)<1e-8).All(x=>x),
                     "Translated/rotated obstacle corners preserve outlet distances: "+angle);
             }
+            // Local diagnostic 20260915-150738, FCU 576003: translated to condensate origin,
+            // mirrored X to the outward axis, units mm. No customer absolute coordinates retained.
+            var actualLead=Box(0,362,-16.75,16.75,63.25,96.75);
+            var actualElbow=Box(362,420,-20,20,42,100);
+            var actualDrop=Box(383.25,416.75,-16.75,16.75,-32,42);
+            var replay=OutletLeadPlanner.BeforeObstacles(P(0,0,0),dir,
+                new[]{actualLead,actualElbow,actualDrop},400,10,100,1);
+            Check(replay.SequenceEqual(new[]{252.0,189.0,126.0}),"Measured geometry reproduces logged 252/189/126 mm leads");
+            Check(OutletLeadPlanner.BeforeObstacles(P(0,0,0),dir,new[]{actualLead},400,10,100,1).Length==0,
+                "Measured adjacent supply lead cannot alone propose a positive turn length");
+            var measuredPrefix=LowerFlipRoutePlanner.Approach(P(0,0,0),dir,replay[0],150,0,1);
+            var measuredRoute=LowerFlipRoutePlanner.Complete(measuredPrefix,P(252,1916.748,89.2),1);
+            bool measuredHit=false;
+            foreach(var box in new[]{actualLead,actualElbow,actualDrop})
+                for(int i=1;i<measuredRoute.Length;i++) measuredHit|=Hit(measuredRoute[i-1],measuredRoute[i],box);
+            Check(!measuredHit,"Measured early-turn polyline avoids the three local supply obstacle boxes");
             Reject(()=>OutletLeadPlanner.BeforeObstacles(start,dir,new[]{obstacle},double.NaN,.01,.1,.001),"NaN requested lead rejected");
             Reject(()=>OutletLeadPlanner.BeforeObstacles(start,dir,new[]{obstacle},.4,-.01,.1,.001),"Invalid radius rejected");
             Reject(()=>OutletLeadPlanner.BeforeObstacles(start,dir,new[]{new[]{P(0,0,0)}},.4,.01,.1,.001),"Incomplete obstacle box rejected");

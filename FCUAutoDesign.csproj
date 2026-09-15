@@ -91,6 +91,9 @@
     <Compile Include="Services\RoomBatchContext.cs" />
     <Compile Include="Services\FcuBatchService.cs" />
     <Compile Include="Models\RoomExecutionResult.cs" />
+    <Compile Include="Models\DesignRecordContract.cs" />
+    <Compile Include="Domain\EquipmentSelection\EquipmentSelectionModels.cs" />
+    <Compile Include="Domain\EquipmentSelection\EquipmentSelectionCalculator.cs" />
     <Compile Include="Presentation\BatchReportPresenter.cs" />
     <Compile Include="Presentation\ExecutionReportPresenter.cs" />
     <Compile Include="Presentation\CondensateMainPicker.cs" />

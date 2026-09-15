@@ -14,5 +14,6 @@ namespace FCUAutoDesign
         public ElementId MainPart2Id { get; set; }
         public ElementId MainPart1AdapterId { get; set; }
         public ElementId MainPart2AdapterId { get; set; }
+        public Dictionary<int, string> ElementRoles { get; } = new Dictionary<int, string>();
     }
 }

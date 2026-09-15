@@ -35,6 +35,9 @@ namespace FCUAutoDesign
 
         private static string Role(TeeConnectionResult result, ElementId id)
         {
+            string detailedRole;
+            if (result != null && result.ElementRoles.TryGetValue(id.IntegerValue, out detailedRole))
+                return detailedRole;
             if (result != null && result.TeeCreated)
             {
                 if (id == result.MainPart1Id || id == result.MainPart2Id) return "主管";

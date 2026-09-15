@@ -36,68 +36,76 @@ namespace FCUAutoDesign
             ElementId ownerId = connector.Owner.Id;
             int connectorId = connector.Id;
             double step = Math.Max(100 * MM_TO_FEET, diameter * 4);
+            int[] lateralSteps = { 0, -1, 1, -2, 2 };
 
-            for (int leadStep = 0; leadStep <= MaxCandidateStep; leadStep++)
+            foreach (int lateralStep in lateralSteps)
             {
-                for (int dropStep = 0; dropStep <= MaxCandidateStep; dropStep++)
+                int maxDropStep = lateralStep == 0 ? MaxCandidateStep : 4;
+                for (int leadStep = 0; leadStep <= MaxCandidateStep; leadStep++)
                 {
-                    double candidateLead = leadLength + leadStep * step;
-                    double candidateDrop = drop + dropStep * step;
-                    HashSet<int> originalRoles = new HashSet<int>(reporter.ElementRoles.Keys);
-                    using (SubTransaction candidate = new SubTransaction(doc))
+                    for (int dropStep = 0; dropStep <= maxDropStep; dropStep++)
                     {
-                        if (candidate.Start() != TransactionStatus.Started)
-                            throw new InvalidOperationException("冷凝水避让候选事务未能启动。");
-                        try
+                        double candidateLead = leadLength + leadStep * step;
+                        double candidateDrop = drop + dropStep * step;
+                        double candidateLateral = lateralStep * step;
+                        HashSet<int> originalRoles = new HashSet<int>(reporter.ElementRoles.Keys);
+                        using (SubTransaction candidate = new SubTransaction(doc))
                         {
-                            FamilyInstance fcu = doc.GetElement(ownerId) as FamilyInstance;
-                            Connector current = fcu?.MEPModel?.ConnectorManager?.Connectors.Cast<Connector>()
-                                .SingleOrDefault(c => c.Id == connectorId);
-                            Pipe currentMain = doc.GetElement(mainId) as Pipe;
-                            TeeConnectionResult connectionResult = connection.ConnectWithLowerFlipAndTee(
-                                doc, current, currentMain, diameter, candidateDrop, candidateLead, true,
-                                "冷凝水", reporter, run, MEPSystemClassification.Sanitary);
-                            if (!connectionResult.BranchCreated || !connectionResult.TeeCreated)
-                                throw new InvalidOperationException(connectionResult.ErrorMessage ?? "冷凝水连接未完成。");
+                            if (candidate.Start() != TransactionStatus.Started)
+                                throw new InvalidOperationException("冷凝水避让候选事务未能启动。");
+                            try
+                            {
+                                FamilyInstance fcu = doc.GetElement(ownerId) as FamilyInstance;
+                                Connector current = fcu?.MEPModel?.ConnectorManager?.Connectors.Cast<Connector>()
+                                    .SingleOrDefault(c => c.Id == connectorId);
+                                Pipe currentMain = doc.GetElement(mainId) as Pipe;
+                                TeeConnectionResult connectionResult = connection.ConnectWithLowerFlipAndTee(
+                                    doc, current, currentMain, diameter, candidateDrop, candidateLead, true,
+                                    "冷凝水", reporter, run, MEPSystemClassification.Sanitary,
+                                    candidateLateral);
+                                if (!connectionResult.BranchCreated || !connectionResult.TeeCreated)
+                                    throw new InvalidOperationException(connectionResult.ErrorMessage ?? "冷凝水连接未完成。");
 
-                            doc.Regenerate();
-                            Verify(doc, connectionResult, supply, ret);
-                            batch?.VerifyNew(doc, connectionResult);
-                            if (candidate.Commit() != TransactionStatus.Committed)
-                                throw new InvalidOperationException("冷凝水避让候选未成功提交。");
+                                doc.Regenerate();
+                                Verify(doc, connectionResult, supply, ret);
+                                batch?.VerifyNew(doc, connectionResult);
+                                if (candidate.Commit() != TransactionStatus.Committed)
+                                    throw new InvalidOperationException("冷凝水避让候选未成功提交。");
 
-                            CondensateDrainResult result = Wrap(doc, connectionResult);
-                            if (leadStep != 0 || dropStep != 0)
-                                result.ErrorMessage = $"冷凝水采用供回水同路径避让，预留段 {candidateLead * FEET_TO_MM:F0} mm，"
-                                    + $"下翻高度 {candidateDrop * FEET_TO_MM:F0} mm。";
-                            return result;
+                                CondensateDrainResult result = Wrap(doc, connectionResult);
+                                if (leadStep != 0 || dropStep != 0 || lateralStep != 0)
+                                    result.ErrorMessage = $"冷凝水采用避让路径，预留段 {candidateLead * FEET_TO_MM:F0} mm，"
+                                        + $"下翻高度 {candidateDrop * FEET_TO_MM:F0} mm，设备侧横移 {candidateLateral * FEET_TO_MM:F0} mm。";
+                                return result;
+                            }
+                            catch (Autodesk.Revit.Exceptions.RegenerationFailedException)
+                            {
+                                throw;
+                            }
+                            catch (Exception ex)
+                            {
+                                lastReason = $"预留 {candidateLead * FEET_TO_MM:F0} mm，下翻 {candidateDrop * FEET_TO_MM:F0} mm，"
+                                    + $"设备侧横移 {candidateLateral * FEET_TO_MM:F0} mm：{ex.Message}";
+                                if (candidate.GetStatus() == TransactionStatus.Started
+                                    && candidate.RollBack() != TransactionStatus.RolledBack)
+                                    throw new InvalidOperationException("冷凝水候选回滚失败，必须取消整次操作。", ex);
+                            }
                         }
-                        catch (Autodesk.Revit.Exceptions.RegenerationFailedException)
-                        {
-                            throw;
-                        }
-                        catch (Exception ex)
-                        {
-                            lastReason = $"预留 {candidateLead * FEET_TO_MM:F0} mm，下翻 {candidateDrop * FEET_TO_MM:F0} mm：{ex.Message}";
-                            if (candidate.GetStatus() == TransactionStatus.Started
-                                && candidate.RollBack() != TransactionStatus.RolledBack)
-                                throw new InvalidOperationException("冷凝水候选回滚失败，必须取消整次操作。", ex);
-                        }
+                        foreach (int id in reporter.ElementRoles.Keys.Where(id => !originalRoles.Contains(id)).ToList())
+                            reporter.ElementRoles.Remove(id);
+
+                        // 回滚后重新读取主管、设备和接口，不能继续使用已失效的 Connector 包装对象。
+                        main = doc.GetElement(mainId) as Pipe;
+                        FamilyInstance owner = doc.GetElement(ownerId) as FamilyInstance;
+                        connector = owner?.MEPModel?.ConnectorManager?.Connectors.Cast<Connector>()
+                            .SingleOrDefault(c => c.Id == connectorId);
                     }
-                    foreach (int id in reporter.ElementRoles.Keys.Where(id => !originalRoles.Contains(id)).ToList())
-                        reporter.ElementRoles.Remove(id);
-
-                    // 回滚后重新读取主管、设备和接口，不能继续使用已失效的 Connector 包装对象。
-                    main = doc.GetElement(mainId) as Pipe;
-                    FamilyInstance owner = doc.GetElement(ownerId) as FamilyInstance;
-                    connector = owner?.MEPModel?.ConnectorManager?.Connectors.Cast<Connector>()
-                        .SingleOrDefault(c => c.Id == connectorId);
                 }
             }
 
             return new CondensateDrainResult
             {
-                ErrorMessage = $"{(MaxCandidateStep + 1) * (MaxCandidateStep + 1)} 条冷凝水供回水同路径候选均未通过接管与供回水干涉检查；未保留本次冷凝水操作。最后原因：{lastReason}"
+                ErrorMessage = $"{(MaxCandidateStep + 1) * (MaxCandidateStep + 1) + 4 * (MaxCandidateStep + 1) * 5} 条冷凝水避让候选均未通过接管与供回水干涉检查；未保留本次冷凝水操作。最后原因：{lastReason}"
             };
         }
 
@@ -134,6 +142,8 @@ namespace FCUAutoDesign
             result.Connection.MainPart2Id = source.MainPart2Id;
             result.Connection.MainPart1AdapterId = source.MainPart1AdapterId;
             result.Connection.MainPart2AdapterId = source.MainPart2AdapterId;
+            foreach (KeyValuePair<int, string> role in source.ElementRoles)
+                result.Connection.ElementRoles[role.Key] = role.Value;
             result.Connection.Chain.AddRange(source.Chain);
             foreach (ElementId id in source.Chain)
                 if (doc.GetElement(id) is Pipe)

@@ -22,7 +22,8 @@ namespace FCUAutoDesign
             bool enableTeeFitting,
             string circuit,
             RollBackOnErrorPreprocessor failureReporter, MainPipeRun run = null,
-            MEPSystemClassification? expectedClassificationOverride = null)
+            MEPSystemClassification? expectedClassificationOverride = null,
+            double lateralOffset = 0)
         {
             if (run != null)
                 mainPipe = run.Resolve(doc, fcuConn.Origin + fcuConn.CoordinateSystem.BasisZ * valveClearance);
@@ -49,6 +50,7 @@ namespace FCUAutoDesign
 
             // 2. 向下翻弯避让高差
             XYZ p2 = p1 - XYZ.BasisZ * flipDrop;
+            double minLength = Math.Max(doc.Application.ShortCurveTolerance, MM_TO_FEET);
 
             // 3. 计算在主管轴线上的正交投影点
             LocationCurve mainLocCurve = mainPipe.Location as LocationCurve;
@@ -64,7 +66,22 @@ namespace FCUAutoDesign
                 throw new InvalidOperationException("当前 PoC 只支持水平直线主管。");
             if (Math.Abs(connDir.Z) > 1e-6 || fcuConn.IsConnected)
                 throw new InvalidOperationException("FCU 水管接口必须水平朝外且未被占用。");
-            IntersectionResult projectRes = mainCurve.Project(p2);
+            if (double.IsNaN(lateralOffset) || double.IsInfinity(lateralOffset))
+                throw new InvalidOperationException("横向错位距离必须为有限数值。");
+
+            bool hasLateralOffset = Math.Abs(lateralOffset) > minLength;
+            List<XYZ> points = new List<XYZ> { startPt, p1, p2 };
+            if (hasLateralOffset)
+            {
+                XYZ horizontalDirection = new XYZ(connDir.X, connDir.Y, 0);
+                if (horizontalDirection.GetLength() <= 1e-9)
+                    throw new InvalidOperationException("FCU 接口没有有效的水平出管方向，无法计算横向错位。");
+                horizontalDirection = horizontalDirection.Normalize();
+                XYZ lateralDirection = new XYZ(-horizontalDirection.Y, horizontalDirection.X, 0);
+                points.Add(p2 + lateralDirection * lateralOffset);
+            }
+
+            IntersectionResult projectRes = mainCurve.Project(points[points.Count - 1]);
             if (projectRes == null)
             {
                 result.ErrorMessage = "支管投影超出主管轴线有效范围。";
@@ -72,12 +89,12 @@ namespace FCUAutoDesign
             }
 
             XYZ pMainBreak = projectRes.XYZPoint;
-            XYZ p3 = new XYZ(pMainBreak.X, pMainBreak.Y, p2.Z);
+            XYZ p3 = new XYZ(pMainBreak.X, pMainBreak.Y, points[points.Count - 1].Z);
             XYZ p4 = pMainBreak;
+            points.Add(p3);
+            points.Add(p4);
 
             double normalized = mainCurve.ComputeNormalizedParameter(projectRes.Parameter);
-            double minLength = Math.Max(doc.Application.ShortCurveTolerance, MM_TO_FEET);
-            XYZ[] points = { startPt, p1, p2, p3, p4 };
             if (normalized <= 0 || normalized >= 1
                 || p4.DistanceTo(mainCurve.GetEndPoint(0)) <= minLength
                 || p4.DistanceTo(mainCurve.GetEndPoint(1)) <= minLength)
@@ -97,30 +114,31 @@ namespace FCUAutoDesign
                     + Environment.NewLine + "当前固定路线只计算到所选单段主管的垂直投影，不会沿管网寻找其他接入点。"
                     + "请选取覆盖该投影位置的同系统管段，或调整设备位置/布管路线；不会自动延长主管或把接入点挪到端头。");
             }
-            for (int i = 1; i < points.Length; i++)
+            for (int i = 1; i < points.Count; i++)
                 if (points[i - 1].DistanceTo(points[i]) <= minLength)
                     throw new InvalidOperationException("固定路径产生零长度或过短管段，请调整安装高度、下翻高度或主管位置。");
 
             ElementId levelId = (mainPipe.ReferenceLevel != null) ? mainPipe.ReferenceLevel.Id : ElementId.InvalidElementId;
 
-            // 创建 4 段支管
-            Pipe pipeSeg1 = Pipe.Create(doc, systemTypeId, pipeTypeId, levelId, startPt, p1);
-            Pipe pipeSeg2 = Pipe.Create(doc, systemTypeId, pipeTypeId, levelId, p1, p2);
-            Pipe pipeSeg3 = Pipe.Create(doc, systemTypeId, pipeTypeId, levelId, p2, p3);
-            Pipe pipeSeg4 = Pipe.Create(doc, systemTypeId, pipeTypeId, levelId, p3, p4);
-
-            pipeSeg1.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM).Set(branchDia);
-            pipeSeg2.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM).Set(branchDia);
-            pipeSeg3.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM).Set(branchDia);
-            pipeSeg4.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM).Set(branchDia);
+            // 创建固定正交路径；存在横向错位时多一个横移段和弯头。
+            List<Pipe> segments = new List<Pipe>();
+            for (int i = 1; i < points.Count; i++)
+            {
+                Pipe pipe = Pipe.Create(doc, systemTypeId, pipeTypeId, levelId, points[i - 1], points[i]);
+                Parameter pipeDiameter = pipe.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM);
+                if (pipeDiameter == null || pipeDiameter.IsReadOnly || !pipeDiameter.Set(branchDia))
+                    throw new InvalidOperationException("支管管型无法设置所需管径。");
+                segments.Add(pipe);
+            }
 
             doc.Regenerate();
 
-            Pipe[] segments = { pipeSeg1, pipeSeg2, pipeSeg3, pipeSeg4 };
-            int[] startIds = new int[4];
-            int[] endIds = new int[4];
-            string[] roles = { "设备水平预留段", "下翻段", "横向接近主管段", "竖直接入主管段" };
-            for (int i = 0; i < segments.Length; i++)
+            int[] startIds = new int[segments.Count];
+            int[] endIds = new int[segments.Count];
+            string[] roles = hasLateralOffset
+                ? new[] { "设备水平预留段", "下翻段", "设备侧横移段", "横向接近主管段", "竖直接入主管段" }
+                : new[] { "设备水平预留段", "下翻段", "横向接近主管段", "竖直接入主管段" };
+            for (int i = 0; i < segments.Count; i++)
             {
                 // 在任何管件改变管长之前锁定端头身份，后续不能重新按最近距离选端头。
                 startIds[i] = PipeConnectorAccess.GetClosestConnector(segments[i], points[i], MM_TO_FEET).Id;
@@ -130,7 +148,7 @@ namespace FCUAutoDesign
             Action<string> validateGeometry = stage =>
             {
                 doc.Regenerate();
-                for (int i = 0; i < segments.Length; i++)
+                for (int i = 0; i < segments.Count; i++)
                 {
                     XYZ actual = PipeConnectorAccess.GetPipeConnector(segments[i], endIds[i]).Origin
                         - PipeConnectorAccess.GetPipeConnector(segments[i], startIds[i]).Origin;
@@ -146,15 +164,18 @@ namespace FCUAutoDesign
             };
 
             // 生成直角弯头
-            FamilyInstance elbow1 = ConnectPipesWithElbow(doc, PipeConnectorAccess.GetPipeConnector(pipeSeg1, endIds[0]), PipeConnectorAccess.GetPipeConnector(pipeSeg2, startIds[1]));
-            validateGeometry("第一个弯头生成");
-            FamilyInstance elbow2 = ConnectPipesWithElbow(doc, PipeConnectorAccess.GetPipeConnector(pipeSeg2, endIds[1]), PipeConnectorAccess.GetPipeConnector(pipeSeg3, startIds[2]));
-            validateGeometry("第二个弯头生成");
-            FamilyInstance elbow3 = ConnectPipesWithElbow(doc, PipeConnectorAccess.GetPipeConnector(pipeSeg3, endIds[2]), PipeConnectorAccess.GetPipeConnector(pipeSeg4, startIds[3]));
-            validateGeometry("第三个弯头生成");
+            List<FamilyInstance> elbows = new List<FamilyInstance>();
+            for (int i = 1; i < segments.Count; i++)
+            {
+                FamilyInstance elbow = ConnectPipesWithElbow(doc,
+                    PipeConnectorAccess.GetPipeConnector(segments[i - 1], endIds[i - 1]),
+                    PipeConnectorAccess.GetPipeConnector(segments[i], startIds[i]));
+                elbows.Add(elbow);
+                validateGeometry($"第 {i} 个弯头生成");
+            }
 
             // 连接风盘接管口
-            Connector p1Conn = PipeConnectorAccess.GetPipeConnector(pipeSeg1, startIds[0]);
+            Connector p1Conn = PipeConnectorAccess.GetPipeConnector(segments[0], startIds[0]);
             if (p1Conn != null && !p1Conn.IsConnected && !fcuConn.IsConnected)
             {
                 fcuConn.ConnectTo(p1Conn);
@@ -162,8 +183,12 @@ namespace FCUAutoDesign
             validateGeometry("FCU 接口连接");
             result.BranchCreated = true;
             result.FcuConnectorId = fcuConn.Id;
-            result.Chain.AddRange(new[] { fcuConn.Owner.Id, pipeSeg1.Id, elbow1.Id,
-                pipeSeg2.Id, elbow2.Id, pipeSeg3.Id, elbow3.Id, pipeSeg4.Id });
+            result.Chain.Add(fcuConn.Owner.Id);
+            for (int i = 0; i < segments.Count; i++)
+            {
+                result.Chain.Add(segments[i].Id);
+                if (i < elbows.Count) result.Chain.Add(elbows[i].Id);
+            }
             if (!verifier.VerifyConnectionChain(doc, result))
                 throw new InvalidOperationException("FCU 与支管、弯头之间存在未连接节点，已取消本次操作。");
 
@@ -194,7 +219,7 @@ namespace FCUAutoDesign
                     // 2. 抓取断点处的 3 个端头连接件
                     Connector cMain1 = PipeConnectorAccess.GetClosestConnector(mainPipe, pMainBreak, 0.5);
                     Connector cMain2 = PipeConnectorAccess.GetClosestConnector(mainPipePart2, pMainBreak, 0.5);
-                    Connector cBranch = PipeConnectorAccess.GetPipeConnector(pipeSeg4, endIds[3]);
+                    Connector cBranch = PipeConnectorAccess.GetPipeConnector(segments[segments.Count - 1], endIds[segments.Count - 1]);
 
                     if (cMain1 != null && cMain2 != null && cBranch != null)
                     {
@@ -251,7 +276,26 @@ namespace FCUAutoDesign
                 }
             }
 
+            CaptureRoles(result, failureReporter);
             return result;
+        }
+
+        private static void CaptureRoles(TeeConnectionResult result, RollBackOnErrorPreprocessor reporter)
+        {
+            foreach (ElementId id in result.Chain)
+            {
+                string role;
+                if (reporter.ElementRoles.TryGetValue(id.IntegerValue, out role))
+                    result.ElementRoles[id.IntegerValue] = role;
+            }
+            foreach (ElementId id in new[] { result.MainPart1Id, result.MainPart2Id,
+                result.MainPart1AdapterId, result.MainPart2AdapterId })
+            {
+                if (id == null) continue;
+                string role;
+                if (reporter.ElementRoles.TryGetValue(id.IntegerValue, out role))
+                    result.ElementRoles[id.IntegerValue] = role;
+            }
         }
 
         private static ElementId CaptureTeeAdapter(Connector pipeEnd, FamilyInstance tee,

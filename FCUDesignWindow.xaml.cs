@@ -10,7 +10,9 @@ namespace FCUAutoDesign
         public double FcuElevationMm { get; private set; } = 2600;
         public double ValveClearanceMm { get; private set; } = 400;
         public double FlipDropMm { get; private set; } = 150;
+        public double CoolingIndexWPerSquareMeter { get; private set; } = 200;
         public bool EnableAutoSizing { get; private set; } = true;
+        public bool EnableBusinessRulePreview { get; private set; } = true;
         public bool EnableReturnPipe { get; private set; } = true;
         public bool EnableCondensate { get; private set; } = false;
         public bool BreakCurveAndTee { get; private set; } = true;
@@ -32,11 +34,12 @@ namespace FCUAutoDesign
         {
             if (!TryReadParameters())
             {
-                MessageBox.Show(this, "请选择 FCU 类型。距离和高度必须是有限的正数。", "参数无效");
+                MessageBox.Show(this, "请选择 FCU 类型。距离、高度必须是有限的正数，冷指标必须是非负数。", "参数无效");
                 return;
             }
 
             EnableAutoSizing = ChkAutoDn.IsChecked == true;
+            EnableBusinessRulePreview = ChkBusinessPreview.IsChecked == true;
             EnableReturnPipe = ChkEnableReturn.IsChecked == true;
             EnableCondensate = ChkEnableCondensate.IsChecked == true;
             BreakCurveAndTee = ChkBreakCurve.IsChecked == true;
@@ -47,16 +50,18 @@ namespace FCUAutoDesign
 
         private bool TryReadParameters()
         {
-            double dOffset, fElev, vClear, fDrop;
+            double dOffset, fElev, vClear, fDrop, coolingIndex;
             if (!SelectedFcuTypeId.HasValue) return false;
             if (!TryPositive(TxtDoorOffset.Text, out dOffset)
                 || !TryPositive(TxtFcuElevation.Text, out fElev)
                 || !TryPositive(TxtValveClearance.Text, out vClear)
-                || !TryPositive(TxtFlipDrop.Text, out fDrop)) return false;
+                || !TryPositive(TxtFlipDrop.Text, out fDrop)
+                || !TryNonNegative(TxtCoolingIndex.Text, out coolingIndex)) return false;
             DoorOffsetMm = dOffset;
             FcuElevationMm = fElev;
             ValveClearanceMm = vClear;
             FlipDropMm = fDrop;
+            CoolingIndexWPerSquareMeter = coolingIndex;
             return true;
         }
 
@@ -64,6 +69,12 @@ namespace FCUAutoDesign
         {
             return double.TryParse(value, out number) && !double.IsNaN(number)
                 && !double.IsInfinity(number) && number > 0;
+        }
+
+        private static bool TryNonNegative(string value, out double number)
+        {
+            return double.TryParse(value, out number) && !double.IsNaN(number)
+                && !double.IsInfinity(number) && number >= 0;
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)

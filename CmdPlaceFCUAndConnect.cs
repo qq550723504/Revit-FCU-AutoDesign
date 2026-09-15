@@ -57,7 +57,9 @@ namespace FCUAutoDesign
                     FcuElevationMm = uiWindow.FcuElevationMm,
                     ValveClearanceMm = uiWindow.ValveClearanceMm,
                     FlipDropMm = uiWindow.FlipDropMm,
+                    CoolingIndexWPerSquareMeter = uiWindow.CoolingIndexWPerSquareMeter,
                     EnableAutoSizing = uiWindow.EnableAutoSizing,
+                    EnableBusinessRulePreview = uiWindow.EnableBusinessRulePreview,
                     EnableReturnPipe = uiWindow.EnableReturnPipe,
                     EnableCondensate = uiWindow.EnableCondensate,
                     BreakCurveAndTee = uiWindow.BreakCurveAndTee
@@ -73,6 +75,17 @@ namespace FCUAutoDesign
                     .Where(r => r != null).GroupBy(r => r.Id.IntegerValue).Select(g => g.First()).ToList();
                 if (rooms.Count == 0) return Result.Cancelled;
                 FcuBatchService.ValidateRooms(rooms);
+
+                if (options.EnableBusinessRulePreview)
+                {
+                    FamilySymbol selectedSymbol = doc.GetElement(
+                        new ElementId(options.SelectedFcuTypeId)) as FamilySymbol;
+                    string selectedTypeName = selectedSymbol == null
+                        ? "未找到"
+                        : selectedSymbol.FamilyName + " : " + selectedSymbol.Name;
+                    if (!new FcuBusinessPreviewService().Confirm(doc, rooms, options, selectedTypeName))
+                        return Result.Cancelled;
+                }
 
                 Reference supplyRef = uidoc.Selection.PickObject(ObjectType.Element, new PipeFilter(MEPSystemClassification.SupplyHydronic), $"【步骤 2/{totalSteps}】请选择供水水平主管（仅接受 SupplyHydronic 系统分类）");
                 Pipe supplyMainPipe = doc.GetElement(supplyRef) as Pipe;

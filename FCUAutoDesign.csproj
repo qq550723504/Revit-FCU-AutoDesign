@@ -90,6 +90,8 @@
     <Compile Include="Services\MainPipeRun.cs" />
     <Compile Include="Services\RoomBatchContext.cs" />
     <Compile Include="Services\FcuBatchService.cs" />
+    <Compile Include="Services\RoomRuleSnapshotReader.cs" />
+    <Compile Include="Services\FcuBusinessPreviewService.cs" />
     <Compile Include="Models\RoomExecutionResult.cs" />
     <Compile Include="Models\DesignRecordContract.cs" />
     <Compile Include="Domain\EquipmentSelection\EquipmentSelectionModels.cs" />

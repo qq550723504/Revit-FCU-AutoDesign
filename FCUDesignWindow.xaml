@@ -40,6 +40,15 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="100"/>
                         </Grid.ColumnDefinitions>
+                        <TextBlock Text="冷指标 (W/m²):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBox x:Name="TxtCoolingIndex" Grid.Column="1" Text="200" Background="#0f172a" Foreground="#38bdf8" BorderBrush="#475569" Padding="4"/>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="100"/>
+                        </Grid.ColumnDefinitions>
                         <TextBlock Text="风盘相对标高净高 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
                         <TextBox x:Name="TxtFcuElevation" Grid.Column="1" Text="2600" Background="#0f172a" Foreground="#38bdf8" BorderBrush="#475569" Padding="4"/>
                     </Grid>
@@ -72,6 +81,7 @@
                     <Border BorderBrush="#334155" BorderThickness="0,1,0,0" Margin="0,6,0,8" Padding="0,6,0,0">
                         <StackPanel>
                             <CheckBox x:Name="ChkAutoDn" Content="按面积分档选择管径 (&lt;25㎡: DN20, ≥25㎡: DN25)" IsChecked="True" Foreground="#93c5fd" Margin="0,3,0,0" FontSize="11"/>
+                            <CheckBox x:Name="ChkBusinessPreview" Content="启用 FCU-201 业务规则预览（确认后继续现有 PoC）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkEnableReturn" Content="连接走廊回水主管 (双管对称下翻与打断并网)" IsChecked="True" Foreground="#c084fc" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkEnableCondensate" Content="选择冷凝水主管并接入（失败时回滚冷凝水操作）" IsChecked="False" Foreground="#fcd34d" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkBreakCurve" Content="供回水主管打断并插入三通（失败时回滚打断）" IsChecked="True" Foreground="#86efac" Margin="0,6,0,0" FontSize="11"/>

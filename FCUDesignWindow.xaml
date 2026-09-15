@@ -58,7 +58,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="100"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="阀门检修预留段 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBlock Text="供回水阀门预留段 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
                         <TextBox x:Name="TxtValveClearance" Grid.Column="1" Text="400" Background="#0f172a" Foreground="#34d399" BorderBrush="#475569" Padding="4"/>
                     </Grid>
 
@@ -74,7 +74,7 @@
 
 
                     <StackPanel IsEnabled="{Binding IsChecked, ElementName=ChkEnableCondensate}">
-                        <TextBlock Text="冷凝水支管沿用所选主管的管型和系统类型；下一步拾取主管并打断接入。" Foreground="#94a3b8" FontSize="11" TextWrapping="Wrap"/>
+                        <TextBlock Text="冷凝水沿用所选主管管型及系统；遇供回水障碍可缩短首段提前转弯，实际长度见报告。下一步拾取主管并打断接入。" Foreground="#94a3b8" FontSize="11" TextWrapping="Wrap"/>
                     </StackPanel>
 
                     <!-- 功能控制开关 (已修复 XAML 转义与参数接通) -->

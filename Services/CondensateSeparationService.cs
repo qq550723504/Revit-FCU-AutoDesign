@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows.Media.Media3D;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Plumbing;
 using static FCUAutoDesign.RevitUnits;
@@ -38,15 +39,23 @@ namespace FCUAutoDesign
             int connectorId = connector.Id;
             double step = Math.Max(100 * MM_TO_FEET, diameter * 4);
             int[] lateralSteps = { 0, -1, 1, -2, 2 };
+            XYZ origin = connector.Origin, direction = connector.CoordinateSystem.BasisZ;
+            double minLength = Math.Max(doc.Application.ShortCurveTolerance, MM_TO_FEET);
+            double[] earlyLeads = OutletLeadPlanner.BeforeObstacles(
+                new Point3D(origin.X, origin.Y, origin.Z), new Vector3D(direction.X, direction.Y, direction.Z),
+                ReadObstacleCorners(doc, supply, ret), leadLength,
+                Math.Max(diameter / 2, connector.Radius), step, minLength);
+            // 先尝试在已有供回水前转弯；保留原候选，因为包围盒可能保守地高估障碍。
+            double[] leads = earlyLeads.Concat(Enumerable.Range(0, MaxCandidateStep + 1)
+                .Select(i => leadLength + i * step)).ToArray();
 
             foreach (int lateralStep in lateralSteps)
             {
                 int maxDropStep = lateralStep == 0 ? MaxCandidateStep : 4;
-                for (int leadStep = 0; leadStep <= MaxCandidateStep; leadStep++)
+                foreach (double candidateLead in leads)
                 {
                     for (int dropStep = 0; dropStep <= maxDropStep; dropStep++)
                     {
-                        double candidateLead = leadLength + leadStep * step;
                         double candidateDrop = drop + dropStep * step;
                         double candidateLateral = lateralStep * step;
                         attempts++;
@@ -75,9 +84,10 @@ namespace FCUAutoDesign
                                     throw new InvalidOperationException("冷凝水避让候选未成功提交。");
 
                                 CondensateDrainResult result = Wrap(doc, connectionResult);
-                                if (leadStep != 0 || dropStep != 0 || lateralStep != 0)
+                                if (candidateLead != leadLength || dropStep != 0 || lateralStep != 0)
                                     result.ErrorMessage = $"冷凝水采用避让路径，预留段 {candidateLead * FEET_TO_MM:F0} mm，"
-                                        + $"下翻高度 {candidateDrop * FEET_TO_MM:F0} mm，设备侧横移 {candidateLateral * FEET_TO_MM:F0} mm。";
+                                        + $"下翻高度 {candidateDrop * FEET_TO_MM:F0} mm，设备侧横移 {candidateLateral * FEET_TO_MM:F0} mm。"
+                                        + (candidateLead < leadLength ? "根据已有供回水位置提前转弯，冷凝水首段短于供回水预留参数。" : "");
                                 return result;
                             }
                             catch (Autodesk.Revit.Exceptions.RegenerationFailedException)
@@ -109,8 +119,38 @@ namespace FCUAutoDesign
             return new CondensateDrainResult
             {
                 ErrorMessage = $"{attempts} 条冷凝水避让候选均未通过接管与供回水干涉检查；未保留本次冷凝水操作。"
-                    + $"首条原因：{firstReason}" + Environment.NewLine + $"最后原因：{lastReason}"
+                    + $"已加入 {earlyLeads.Length} 个障碍前转弯长度。首条原因：{firstReason}"
+                    + Environment.NewLine + $"最后原因：{lastReason}"
             };
+        }
+
+        private static IEnumerable<Point3D[]> ReadObstacleCorners(Document doc,
+            TeeConnectionResult supply, TeeConnectionResult ret)
+        {
+            var ids = new HashSet<ElementId>();
+            foreach (TeeConnectionResult circuit in new[] { supply, ret })
+            {
+                if (circuit == null || !circuit.BranchCreated) continue;
+                foreach (ElementId id in circuit.Chain.Skip(1)) ids.Add(id); // 排除共享 FCU。
+                foreach (ElementId id in new[] { circuit.MainPart1Id, circuit.MainPart2Id,
+                    circuit.MainPart1AdapterId, circuit.MainPart2AdapterId })
+                    if (circuit.TeeCreated && id != null) ids.Add(id);
+            }
+            foreach (ElementId id in ids)
+            {
+                BoundingBoxXYZ box = doc.GetElement(id)?.get_BoundingBox(null);
+                if (box == null) continue; // 缺盒时不建议缩短；最终实体验证仍执行。
+                var corners = new List<Point3D>();
+                for (int x = 0; x < 2; x++)
+                for (int y = 0; y < 2; y++)
+                for (int z = 0; z < 2; z++)
+                {
+                    XYZ p = box.Transform.OfPoint(new XYZ(x == 0 ? box.Min.X : box.Max.X,
+                        y == 0 ? box.Min.Y : box.Max.Y, z == 0 ? box.Min.Z : box.Max.Z));
+                    corners.Add(new Point3D(p.X, p.Y, p.Z));
+                }
+                yield return corners.ToArray();
+            }
         }
 
         private void Verify(Document doc, TeeConnectionResult result,

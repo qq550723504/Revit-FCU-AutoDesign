@@ -169,3 +169,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-Dialog.ps1 -Ass
 新测试复现旧共线/折返缺陷，覆盖供回水原路径、正负横移、旋转/平移/主管反序、平行和垂直主管、横移跨主管分段、三通间隙、越界及无效输入。3132 是 12 种几何场景各 261 条候选，不代表在 Revit 创建了 3132 条管线。
 
 修正后的实际族/管型弯头生成、5 房间冷凝水接入、实体避让和回滚复核：NOT_RUN。需在干净模型副本中复测，先验证一个房间，再验证五房间批量；不能在此前部分完成的结果上直接重复创建。
+
+## 冷凝水首段被供水下翻管阻挡后的修正
+
+用户提供的 `62f652f` 四房间截图均为部分完成，冷凝水未接入。报告中的首条冲突为供水第 2 段下翻管与冷凝水第一个弯头，最后冲突为同一供水下翻管与冷凝水第 1 段水平预留管。该版本此案例的冷凝水验收为 FAIL；本次修正前仅检查转角，不足以证明能避开障碍。
+
+原候选首段从 400 mm 开始只增加长度，而转弯发生在首段之后。现按已生成供回水管道/管件包围盒建议最多三个更短首段，让冷凝水在障碍前转弯；每组横移优先试这些长度，之后仍保留原组合。该候选建议仅接入冷凝水；供回水阀门预留参数不变。窗口和成功报告明确告知冷凝水首段可以缩短，失败报告显示已加入几个提前转弯长度。最终 Revit 管件、连接链、实体干涉及回滚检查仍执行。
+
+新增自动化场景使用合成几何复现“261 条原候选首段均撞供水下翻管”，独立的线段/盒相交检查确认三条提前转弯路线绕过测试障碍。还覆盖首弯头附近障碍、远离首段的障碍、最近障碍选择、旋转/平移、无正长度空间和无效输入。合成坐标不代表客户模型实际尺寸。
+
+```powershell
+& 'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe' FCUAutoDesign.csproj /t:Rebuild /p:Configuration=Release /p:Platform=x64 /p:RevitVersion=2020 /nologo /verbosity:minimal
+# Exit 0; FCUAutoDesign -> C:\Users\Henry\code\FCUAutoDesign\bin\Release\FCUAutoDesign.dll
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-OutletLead.ps1
+# 20 outlet obstacle checks passed. Reproduced 261 blocked old candidates. Revit fitting/collision/rollback acceptance: NOT_RUN.
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-LowerFlipRoute.ps1
+# 32 checks passed; 3132 active route candidates validated. Revit fitting, collision and rollback acceptance: NOT_RUN.
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File tests\Verify-Dialog.ps1 -AssemblyPath .\bin\Release\FCUAutoDesign.dll
+# 23 checks passed. Revit geometry/connection tests are NOT_RUN by this script.
+```
+
+上述测试及编译为 PASS；修正后的真实模型首弯头安装、冷凝水连通、实体避让及失败回滚验收为 NOT_RUN。包围盒可能保守，提前转弯长度不构成管件安装空间或工程检修净距保证。

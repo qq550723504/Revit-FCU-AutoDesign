@@ -27,6 +27,10 @@ namespace FCUAutoDesign
             failureReporter.ElementRoles[mainPipe.Id.IntegerValue] = circuit + "主管";
             TeeConnectionResult result = new TeeConnectionResult();
             ElementId pipeTypeId = mainPipe.PipeType.Id;
+            int junctionRuleCount = mainPipe.PipeType.RoutingPreferenceManager == null
+                ? 0
+                : mainPipe.PipeType.RoutingPreferenceManager.GetNumberOfRules(
+                    RoutingPreferenceRuleGroupType.Junctions);
             ElementId systemTypeId = mainPipe.get_Parameter(BuiltInParameter.RBS_PIPING_SYSTEM_TYPE_PARAM)?.AsElementId();
             PipingSystemType systemType = systemTypeId == null ? null : doc.GetElement(systemTypeId) as PipingSystemType;
             MEPSystemClassification expected = expectedClassificationOverride
@@ -225,7 +229,13 @@ namespace FCUAutoDesign
                     if (result.TeeCreated)
                         result.Chain.RemoveAt(result.Chain.Count - 1);
                     result.TeeCreated = false;
-                    result.ErrorMessage = "三通创建失败 (通常因管型未配置三通管件族或角度不匹配): " + ex.Message;
+                    Parameter mainDiameter = mainPipe.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM);
+                    string mainDn = mainDiameter == null || !mainDiameter.HasValue
+                        ? "未知主管管径"
+                        : $"DN{mainDiameter.AsDouble() * FEET_TO_MM:F0}";
+                    result.ErrorMessage = $"{circuit}三通创建失败（管型“{mainPipe.PipeType.Name}”，主管 {mainDn}，"
+                        + $"支管 DN{branchDia * FEET_TO_MM:F0}，已配置三通规则 {junctionRuleCount} 条；"
+                        + "请检查同径或异径三通的 Routing Preferences）：" + ex.Message;
                 }
             }
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows.Media.Media3D;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Plumbing;
 using static FCUAutoDesign.RevitUnits;
@@ -25,8 +26,18 @@ namespace FCUAutoDesign
             MEPSystemClassification? expectedClassificationOverride = null,
             double lateralOffset = 0)
         {
+            if (fcuConn == null || fcuConn.IsConnected)
+                throw new InvalidOperationException("FCU 水管接口必须存在且未被占用。");
+            XYZ startPt = fcuConn.Origin;
+            XYZ connDir = fcuConn.CoordinateSystem.BasisZ;
+            double minLength = Math.Max(doc.Application.ShortCurveTolerance, MM_TO_FEET);
+            Point3D[] approach = LowerFlipRoutePlanner.Approach(Point(startPt),
+                new Vector3D(connDir.X, connDir.Y, connDir.Z),
+                valveClearance, flipDrop, lateralOffset, minLength);
+            Point3D approachEnd = approach[approach.Length - 1];
             if (run != null)
-                mainPipe = run.Resolve(doc, fcuConn.Origin + fcuConn.CoordinateSystem.BasisZ * valveClearance);
+                mainPipe = run.Resolve(doc, new XYZ(approachEnd.X, approachEnd.Y, approachEnd.Z));
+            if (mainPipe == null) throw new InvalidOperationException("未选择有效主管。");
             failureReporter.ElementRoles[mainPipe.Id.IntegerValue] = circuit + "主管";
             TeeConnectionResult result = new TeeConnectionResult();
             ElementId pipeTypeId = mainPipe.PipeType.Id;
@@ -42,17 +53,7 @@ namespace FCUAutoDesign
             if (systemType == null || systemType.SystemClassification != expected)
                 throw new InvalidOperationException($"{circuit}主管（元素 ID: {mainPipe.Id.IntegerValue}）系统分类不匹配："
                     + $"期望 {expected}，实际 {systemType?.SystemClassification.ToString() ?? "未指定"}。请重新选择正确系统的主管。");
-            XYZ startPt = fcuConn.Origin;
-            XYZ connDir = fcuConn.CoordinateSystem.BasisZ;
-
-            // 1. 水平阀门平直段
-            XYZ p1 = startPt + connDir * valveClearance;
-
-            // 2. 向下翻弯避让高差
-            XYZ p2 = p1 - XYZ.BasisZ * flipDrop;
-            double minLength = Math.Max(doc.Application.ShortCurveTolerance, MM_TO_FEET);
-
-            // 3. 计算在主管轴线上的正交投影点
+            // 使用与主管段定位相同的横移后接近点计算正交投影。
             LocationCurve mainLocCurve = mainPipe.Location as LocationCurve;
             if (mainLocCurve == null)
             {
@@ -64,24 +65,8 @@ namespace FCUAutoDesign
             if (!(mainCurve is Line) || !mainCurve.IsBound
                 || Math.Abs(mainCurve.GetEndPoint(0).Z - mainCurve.GetEndPoint(1).Z) > MM_TO_FEET)
                 throw new InvalidOperationException("当前 PoC 只支持水平直线主管。");
-            if (Math.Abs(connDir.Z) > 1e-6 || fcuConn.IsConnected)
-                throw new InvalidOperationException("FCU 水管接口必须水平朝外且未被占用。");
-            if (double.IsNaN(lateralOffset) || double.IsInfinity(lateralOffset))
-                throw new InvalidOperationException("横向错位距离必须为有限数值。");
-
-            bool hasLateralOffset = Math.Abs(lateralOffset) > minLength;
-            List<XYZ> points = new List<XYZ> { startPt, p1, p2 };
-            if (hasLateralOffset)
-            {
-                XYZ horizontalDirection = new XYZ(connDir.X, connDir.Y, 0);
-                if (horizontalDirection.GetLength() <= 1e-9)
-                    throw new InvalidOperationException("FCU 接口没有有效的水平出管方向，无法计算横向错位。");
-                horizontalDirection = horizontalDirection.Normalize();
-                XYZ lateralDirection = new XYZ(-horizontalDirection.Y, horizontalDirection.X, 0);
-                points.Add(p2 + lateralDirection * lateralOffset);
-            }
-
-            IntersectionResult projectRes = mainCurve.Project(points[points.Count - 1]);
+            bool hasLateralOffset = lateralOffset != 0;
+            IntersectionResult projectRes = mainCurve.Project(new XYZ(approachEnd.X, approachEnd.Y, approachEnd.Z));
             if (projectRes == null)
             {
                 result.ErrorMessage = "支管投影超出主管轴线有效范围。";
@@ -89,10 +74,7 @@ namespace FCUAutoDesign
             }
 
             XYZ pMainBreak = projectRes.XYZPoint;
-            XYZ p3 = new XYZ(pMainBreak.X, pMainBreak.Y, points[points.Count - 1].Z);
             XYZ p4 = pMainBreak;
-            points.Add(p3);
-            points.Add(p4);
 
             double normalized = mainCurve.ComputeNormalizedParameter(projectRes.Parameter);
             if (normalized <= 0 || normalized >= 1
@@ -114,9 +96,8 @@ namespace FCUAutoDesign
                     + Environment.NewLine + "当前固定路线只计算到所选单段主管的垂直投影，不会沿管网寻找其他接入点。"
                     + "请选取覆盖该投影位置的同系统管段，或调整设备位置/布管路线；不会自动延长主管或把接入点挪到端头。");
             }
-            for (int i = 1; i < points.Count; i++)
-                if (points[i - 1].DistanceTo(points[i]) <= minLength)
-                    throw new InvalidOperationException("固定路径产生零长度或过短管段，请调整安装高度、下翻高度或主管位置。");
+            List<XYZ> points = LowerFlipRoutePlanner.Complete(approach, Point(pMainBreak), minLength)
+                .Select(p => new XYZ(p.X, p.Y, p.Z)).ToList();
 
             ElementId levelId = (mainPipe.ReferenceLevel != null) ? mainPipe.ReferenceLevel.Id : ElementId.InvalidElementId;
 
@@ -136,7 +117,7 @@ namespace FCUAutoDesign
             int[] startIds = new int[segments.Count];
             int[] endIds = new int[segments.Count];
             string[] roles = hasLateralOffset
-                ? new[] { "设备水平预留段", "下翻段", "设备侧横移段", "横向接近主管段", "竖直接入主管段" }
+                ? new[] { "设备水平预留段", "设备侧横移段", "下翻段", "横向接近主管段", "竖直接入主管段" }
                 : new[] { "设备水平预留段", "下翻段", "横向接近主管段", "竖直接入主管段" };
             for (int i = 0; i < segments.Count; i++)
             {
@@ -167,9 +148,20 @@ namespace FCUAutoDesign
             List<FamilyInstance> elbows = new List<FamilyInstance>();
             for (int i = 1; i < segments.Count; i++)
             {
-                FamilyInstance elbow = ConnectPipesWithElbow(doc,
-                    PipeConnectorAccess.GetPipeConnector(segments[i - 1], endIds[i - 1]),
-                    PipeConnectorAccess.GetPipeConnector(segments[i], startIds[i]));
+                FamilyInstance elbow;
+                try
+                {
+                    elbow = ConnectPipesWithElbow(doc,
+                        PipeConnectorAccess.GetPipeConnector(segments[i - 1], endIds[i - 1]),
+                        PipeConnectorAccess.GetPipeConnector(segments[i], startIds[i]));
+                }
+                catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"{circuit}第 {i} 个弯头（{roles[i - 1]} → {roles[i]}）创建失败，"
+                        + $"管型“{mainPipe.PipeType.Name}”、支管 DN{branchDia * FEET_TO_MM:F0}：{ex.Message}", ex);
+                }
+                failureReporter.ElementRoles[elbow.Id.IntegerValue] = $"{circuit}第 {i} 个弯头（{roles[i - 1]} → {roles[i]}）";
                 elbows.Add(elbow);
                 validateGeometry($"第 {i} 个弯头生成");
             }
@@ -197,6 +189,7 @@ namespace FCUAutoDesign
             {
                 result.TeeCreated = false;
                 result.ErrorMessage = "用户配置未启用主管切断并网。";
+                CaptureRoles(result, failureReporter);
                 return result;
             }
 
@@ -231,6 +224,7 @@ namespace FCUAutoDesign
 
                         if (tee == null)
                             throw new InvalidOperationException("Revit 未生成三通实例。");
+                        failureReporter.ElementRoles[tee.Id.IntegerValue] = circuit + "接入三通";
                         ElementId branchAdapter = CaptureTeeAdapter(cBranch, tee, beforeTee,
                             failureReporter, circuit + "支管至三通过渡管件");
                         if (branchAdapter != null) result.Chain.Add(branchAdapter);
@@ -279,6 +273,8 @@ namespace FCUAutoDesign
             CaptureRoles(result, failureReporter);
             return result;
         }
+
+        private static Point3D Point(XYZ p) { return new Point3D(p.X, p.Y, p.Z); }
 
         private static void CaptureRoles(TeeConnectionResult result, RollBackOnErrorPreprocessor reporter)
         {

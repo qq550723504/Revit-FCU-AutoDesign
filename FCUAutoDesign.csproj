@@ -85,6 +85,7 @@
     <Compile Include="Services\CondensateSystemPolicy.cs" />
     <Compile Include="Models\CondensateDrainResult.cs" />
     <Compile Include="Geometry\CondensateRoutePlanner.cs" />
+    <Compile Include="Geometry\LowerFlipRoutePlanner.cs" />
     <Compile Include="Geometry\MainPipeSegmentLocator.cs" />
     <Compile Include="Services\FcuDesignService.cs" />
     <Compile Include="Services\MainPipeRun.cs" />

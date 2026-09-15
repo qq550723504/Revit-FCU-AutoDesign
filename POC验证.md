@@ -144,3 +144,28 @@ Global 管道端接口候选修复：编译与 229 项分类映射/候选组合�
 - 后续打断若破坏已成功房间连接，新房间事务组必须回滚。
 
 冷凝水现改用与供回水相同的固定路径：水平出管、下翻、横向接近主管、竖直接入并插入三通。先尝试预留长度和下翻高度各增加 0～8 个步长的 81 条路线；仍冲突时，再尝试设备侧左右横移 1～2 个步长并将下翻高度增加 0～4 个步长，共最多 261 条候选。每条候选仍要求完整连接及实体干涉检查通过，失败完整回滚。真实 Revit 管件生成及本例碰撞消除仍需模型验证。
+
+## 261 条候选弯头失败后的路径修正
+
+用户提供的 `543595c` 测试截图：5 间均部分完成，供回水已接主管，冷凝水均失败，最后提示 `failed to insert elbow`。该版本冷凝水模型验收为 FAIL；截图不能证明失败发生在第几个弯头，也不能证明回滚后的全部模型状态。
+
+代码及几何复现确认：原来的“下翻 → 横移 → 接近主管”在出管方向平行主管时产生同向共线或反向折返，仍尝试插入弯头；主管段定位也遗漏了横移量。本次改为“水平预留 → 横移 → 下翻 → 接近主管 → 竖直接入”，定位和投影共用横移后的接近点，创建前拒绝过短和非直角路线。候选上限仍为 261；实体干涉、连接链及候选回滚保护继续执行。首条和最后失败原因均保留，弯头错误带段位和管型。
+
+当前运行路径由 `HydronicConnectionService` 调用 `LowerFlipRoutePlanner`。旧 `Verify-CondensateRoute.ps1` 只测试未接入的旧算法，不能作为本次修正的验证证据。
+
+本次命令与真实输出：
+
+```powershell
+& 'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe' FCUAutoDesign.csproj /t:Rebuild /p:Configuration=Release /p:Platform=x64 /p:RevitVersion=2020 /nologo /verbosity:minimal
+# Exit 0; FCUAutoDesign -> C:\Users\Henry\code\FCUAutoDesign\bin\Release\FCUAutoDesign.dll
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-LowerFlipRoute.ps1
+# 32 checks passed; 3132 active route candidates validated. Revit fitting, collision and rollback acceptance: NOT_RUN.
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-MainPipeSegments.ps1
+# 14 segment checks passed. Revit batch integration tests are NOT_RUN.
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-Dialog.ps1 -AssemblyPath .\bin\Release\FCUAutoDesign.dll
+# 23 checks passed. Revit geometry/connection tests are NOT_RUN by this script.
+```
+
+新测试复现旧共线/折返缺陷，覆盖供回水原路径、正负横移、旋转/平移/主管反序、平行和垂直主管、横移跨主管分段、三通间隙、越界及无效输入。3132 是 12 种几何场景各 261 条候选，不代表在 Revit 创建了 3132 条管线。
+
+修正后的实际族/管型弯头生成、5 房间冷凝水接入、实体避让和回滚复核：NOT_RUN。需在干净模型副本中复测，先验证一个房间，再验证五房间批量；不能在此前部分完成的结果上直接重复创建。

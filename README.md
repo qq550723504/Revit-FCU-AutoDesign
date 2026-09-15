@@ -44,7 +44,8 @@ msbuild FCUAutoDesign.csproj /p:RevitVersion=2022 /p:RevitInstallPath="C:\Progra
 - `Services/CondensateSeparationService.cs`：冷凝水复用供回水固定路径，执行 Sanitary 系统的支管、主管打断与三通接入
 - `Services/FcuConnectorResolver.cs`、`Services/FcuTypeCatalog.cs`：设备接口识别和候选族类型查询
 - `Services/ConnectionChainVerifier.cs`：按指定接口与元素链验证连接关系
-- `Geometry/CondensateRoutePlanner.cs`：独立于 Revit 模型的重力排水路径计算
+- `Geometry/LowerFlipRoutePlanner.cs`：当前供回水和冷凝水接管使用的路径计算与直角转折校验
+- `Geometry/CondensateRoutePlanner.cs`：旧版冷凝水几何计算，当前接管流程不调用；其测试不能证明当前路线通过
 - `Models/`：参数快照、放置结果、连接结果与执行结果
 - `Infrastructure/`：单位常量、拾取过滤器、管道接口访问和 Revit 失败处理器
 - `Presentation/ExecutionReportPresenter.cs`：执行结果报告

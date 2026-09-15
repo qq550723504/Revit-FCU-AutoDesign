@@ -13,8 +13,7 @@ namespace FCUAutoDesign
         private readonly HydronicConnectionService connection = new HydronicConnectionService();
         private readonly ConnectionChainVerifier verifier = new ConnectionChainVerifier();
 
-        // 冷凝水与供回水采用同一条“水平预留→下翻→横向→竖直接入→三通”路径。
-        // 区别只在系统分类为 Sanitary，以及使用冷凝水支管管径。
+        // 复用供回水接管；横移候选在水平预留后、下翻前横移。
         public CondensateDrainResult Connect(Document doc, Connector connector, Pipe main,
             ElementId levelId, double diameter, RollBackOnErrorPreprocessor reporter,
             TeeConnectionResult supply, TeeConnectionResult ret, MainPipeRun run = null,
@@ -32,6 +31,8 @@ namespace FCUAutoDesign
                 throw new InvalidOperationException("冷凝水预留段和下翻高度必须为有限正数。");
 
             string lastReason = "没有可用路线";
+            string firstReason = null;
+            int attempts = 0;
             ElementId mainId = main.Id;
             ElementId ownerId = connector.Owner.Id;
             int connectorId = connector.Id;
@@ -48,6 +49,7 @@ namespace FCUAutoDesign
                         double candidateLead = leadLength + leadStep * step;
                         double candidateDrop = drop + dropStep * step;
                         double candidateLateral = lateralStep * step;
+                        attempts++;
                         HashSet<int> originalRoles = new HashSet<int>(reporter.ElementRoles.Keys);
                         using (SubTransaction candidate = new SubTransaction(doc))
                         {
@@ -86,6 +88,7 @@ namespace FCUAutoDesign
                             {
                                 lastReason = $"预留 {candidateLead * FEET_TO_MM:F0} mm，下翻 {candidateDrop * FEET_TO_MM:F0} mm，"
                                     + $"设备侧横移 {candidateLateral * FEET_TO_MM:F0} mm：{ex.Message}";
+                                if (firstReason == null) firstReason = lastReason;
                                 if (candidate.GetStatus() == TransactionStatus.Started
                                     && candidate.RollBack() != TransactionStatus.RolledBack)
                                     throw new InvalidOperationException("冷凝水候选回滚失败，必须取消整次操作。", ex);
@@ -105,7 +108,8 @@ namespace FCUAutoDesign
 
             return new CondensateDrainResult
             {
-                ErrorMessage = $"{(MaxCandidateStep + 1) * (MaxCandidateStep + 1) + 4 * (MaxCandidateStep + 1) * 5} 条冷凝水避让候选均未通过接管与供回水干涉检查；未保留本次冷凝水操作。最后原因：{lastReason}"
+                ErrorMessage = $"{attempts} 条冷凝水避让候选均未通过接管与供回水干涉检查；未保留本次冷凝水操作。"
+                    + $"首条原因：{firstReason}" + Environment.NewLine + $"最后原因：{lastReason}"
             };
         }
 

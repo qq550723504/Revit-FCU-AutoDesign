@@ -9,6 +9,7 @@ namespace FCUAutoDesign
 {
     internal class CondensateSeparationService
     {
+        private const int MaxCandidateStep = 8;
         private readonly HydronicConnectionService connection = new HydronicConnectionService();
         private readonly ConnectionChainVerifier verifier = new ConnectionChainVerifier();
 
@@ -36,9 +37,9 @@ namespace FCUAutoDesign
             int connectorId = connector.Id;
             double step = Math.Max(100 * MM_TO_FEET, diameter * 4);
 
-            for (int leadStep = 0; leadStep <= 4; leadStep++)
+            for (int leadStep = 0; leadStep <= MaxCandidateStep; leadStep++)
             {
-                for (int dropStep = 0; dropStep <= 4; dropStep++)
+                for (int dropStep = 0; dropStep <= MaxCandidateStep; dropStep++)
                 {
                     double candidateLead = leadLength + leadStep * step;
                     double candidateDrop = drop + dropStep * step;
@@ -96,7 +97,7 @@ namespace FCUAutoDesign
 
             return new CondensateDrainResult
             {
-                ErrorMessage = $"25 条冷凝水供回水同路径候选均未通过接管与供回水干涉检查；未保留本次冷凝水操作。最后原因：{lastReason}"
+                ErrorMessage = $"{(MaxCandidateStep + 1) * (MaxCandidateStep + 1)} 条冷凝水供回水同路径候选均未通过接管与供回水干涉检查；未保留本次冷凝水操作。最后原因：{lastReason}"
             };
         }
 

@@ -26,7 +26,7 @@ namespace FCUAutoDesign
             if (room == null || room.Level == null)
                 return Fail(result, "房间或房间标高无效。");
 
-            FamilyInstance door = selectedDoor ?? FindDoorForRoom(doc, room);
+            FamilyInstance door = selectedDoor ?? ResolveDoorForRoom(doc, room);
             if (selectedDoor != null && !BelongsToRoom(selectedDoor, room))
                 return Fail(result, "所选门不属于当前房间。");
             Wall doorWall = door == null ? null : door.Host as Wall;
@@ -85,12 +85,58 @@ namespace FCUAutoDesign
             return result;
         }
 
-        private static FamilyInstance FindDoorForRoom(Document doc, Room room)
+        // Returns a deterministic door when all associated doors lie on one
+        // horizontal wall edge. Returns null when the room has no door or the
+        // doors are on different edges and a user pick is required.
+        internal static FamilyInstance ResolveDoorForRoom(Document doc, Room room)
         {
             List<FamilyInstance> doors = FindDoors(doc, room);
-            if (doors.Count != 1)
+            if (doors.Count <= 1)
+                return doors.SingleOrDefault();
+
+            List<Line> wallLines = doors.Select(x => (x.Host as Wall)?.Location as LocationCurve)
+                .Select(x => x?.Curve as Line).ToList();
+            if (wallLines.Any(x => x == null) || !AreCollinearWallLines(wallLines))
                 return null;
-            return doors[0];
+
+            // Same-edge doors have the same L/H axes. For the placement point,
+            // choose the door nearest the room centre, then ElementId as a
+            // stable tie-breaker; no geometric guess is made across walls.
+            BoundingBoxXYZ bounds = room.get_BoundingBox(null);
+            XYZ center = bounds == null ? null : (bounds.Min + bounds.Max) * 0.5;
+            return doors.OrderBy(x => DoorDistanceSquared(x, center))
+                .ThenBy(x => x.Id.IntegerValue).First();
+        }
+
+        private static bool AreCollinearWallLines(IList<Line> lines)
+        {
+            const double tolerance = 1.0 / 304.8;
+            Line first = lines[0];
+            if (Math.Abs(first.Direction.Z) > tolerance) return false;
+            XYZ firstDirection = new XYZ(first.Direction.X, first.Direction.Y, 0);
+            if (firstDirection.GetLength() <= tolerance) return false;
+            firstDirection = firstDirection.Normalize();
+            XYZ perpendicular = XYZ.BasisZ.CrossProduct(firstDirection).Normalize();
+            XYZ firstPoint = first.GetEndPoint(0);
+            foreach (Line line in lines.Skip(1))
+            {
+                if (Math.Abs(line.Direction.Z) > tolerance) return false;
+                XYZ direction = new XYZ(line.Direction.X, line.Direction.Y, 0);
+                if (direction.GetLength() <= tolerance
+                    || Math.Abs(firstDirection.DotProduct(direction.Normalize())) < 1.0 - 1e-6)
+                    return false;
+                if (Math.Abs((line.GetEndPoint(0) - firstPoint).DotProduct(perpendicular)) > tolerance)
+                    return false;
+            }
+            return true;
+        }
+
+        private static double DoorDistanceSquared(FamilyInstance door, XYZ center)
+        {
+            LocationPoint location = door.Location as LocationPoint;
+            if (center == null || location == null) return double.MaxValue;
+            XYZ delta = location.Point - center;
+            return delta.DotProduct(delta);
         }
 
         internal static List<FamilyInstance> FindDoors(Document doc, Room room)

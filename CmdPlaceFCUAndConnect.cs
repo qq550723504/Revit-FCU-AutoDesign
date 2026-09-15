@@ -82,9 +82,10 @@ namespace FCUAutoDesign
                 foreach (Room room in rooms)
                 {
                     List<FamilyInstance> doors = RoomRuleSnapshotReader.FindDoors(doc, room);
-                    if (doors.Count == 1)
+                    FamilyInstance automaticDoor = RoomRuleSnapshotReader.ResolveDoorForRoom(doc, room);
+                    if (automaticDoor != null)
                     {
-                        options.SelectedDoorIds[room.Id.IntegerValue] = doors[0].Id;
+                        options.SelectedDoorIds[room.Id.IntegerValue] = automaticDoor.Id;
                     }
                     else if (doors.Count > 1)
                     {

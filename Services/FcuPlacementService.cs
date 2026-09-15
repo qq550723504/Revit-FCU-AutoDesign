@@ -109,6 +109,10 @@ namespace FCUAutoDesign
                 return selectedDoor;
             }
 
+            FamilyInstance automaticDoor = RoomRuleSnapshotReader.ResolveDoorForRoom(doc, room);
+            if (automaticDoor != null)
+                return automaticDoor;
+
             FilteredElementCollector collector = new FilteredElementCollector(doc)
                 .OfCategory(BuiltInCategory.OST_Doors)
                 .OfClass(typeof(FamilyInstance));

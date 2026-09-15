@@ -190,3 +190,25 @@ powershell -NoProfile -STA -ExecutionPolicy Bypass -File tests\Verify-Dialog.ps1
 ```
 
 上述测试及编译为 PASS；修正后的真实模型首弯头安装、冷凝水连通、实体避让及失败回滚验收为 NOT_RUN。包围盒可能保守，提前转弯长度不构成管件安装空间或工程检修净距保证。
+
+## 单房间性能诊断轮
+
+最新用户报告仍是四房间部分完成、每间 261 次冷凝水失败、新增提前转弯长度 0。真实模型接管验收为 FAIL，耗时未有实测秒数，不能给出加速倍数。
+
+发现可复现的候选生成缺陷：覆盖出管起点的包围盒得到非正可用长度，原逻辑以全局最小值清空其他障碍提供的候选。现仅把正长度建议参与排序；并不据此忽略起点障碍的真实碰撞。增加回归证明这个缺陷已被覆盖，但客户模型的触发障碍仍需日志确认。
+
+诊断版在创建前用不可变几何快照筛查首段、横移和下翻段与本次供回水直管的中心线距离。筛查不包含完整管件几何及后半段，不声称通过即为可行；最终 Revit 检查继续执行。最多 12 次冷凝水试建，10 秒以后不启动下一次，预算未覆盖单次正在执行的 Revit 调用及先前供回水过程。启用冷凝水时仅执行首个房间，其余 NOT_RUN；局部失败仍报告部分完成。
+
+诊断输出位于 `%LOCALAPPDATA%\FCUAutoDesign\Diagnostics\`，含接口、管段、包围盒、候选及各阶段时间戳。需用户重启 Revit 在干净模型副本中运行首房间后，读取日志建立真实几何回归。本轮未直接操作用户 Revit 模型。
+
+验证命令：
+
+```powershell
+& 'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe' FCUAutoDesign.csproj /t:Rebuild /p:Configuration=Release /p:Platform=x64 /p:RevitVersion=2020 /nologo /verbosity:minimal
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-SegmentClearance.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-OutletLead.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-LowerFlipRoute.ps1
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File tests\Verify-Dialog.ps1 -AssemblyPath .\bin\Release\FCUAutoDesign.dll
+```
+
+真实输出：Rebuild Exit 0；16 clearance checks passed；21 outlet obstacle checks passed；32 checks passed / 3132 active route candidates validated；23 checks passed。实际单房间运行耗时、日志模型数据、试建上限与回滚的 Revit 验证仍为 NOT_RUN。

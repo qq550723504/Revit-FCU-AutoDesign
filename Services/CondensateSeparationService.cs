@@ -11,6 +11,7 @@ namespace FCUAutoDesign
     internal class CondensateSeparationService
     {
         private const int MaxCandidateStep = 8;
+        private const int MaxModelAttempts = 12;
         private readonly HydronicConnectionService connection = new HydronicConnectionService();
         private readonly ConnectionChainVerifier verifier = new ConnectionChainVerifier();
 
@@ -34,17 +35,30 @@ namespace FCUAutoDesign
             string lastReason = "没有可用路线";
             string firstReason = null;
             int attempts = 0;
+            int screened = 0, skipped = 0;
             ElementId mainId = main.Id;
             ElementId ownerId = connector.Owner.Id;
             int connectorId = connector.Id;
             double step = Math.Max(100 * MM_TO_FEET, diameter * 4);
             int[] lateralSteps = { 0, -1, 1, -2, 2 };
             XYZ origin = connector.Origin, direction = connector.CoordinateSystem.BasisZ;
+            var trace = new RoutingDiagnostic(ownerId.IntegerValue);
+            Line selectedMain = (main.Location as LocationCurve)?.Curve as Line;
+            if (selectedMain != null && selectedMain.IsBound)
+                trace.Add("selected condensate main="+main.Id.IntegerValue+" type="+main.GetTypeId().IntegerValue
+                    +" start="+RoutingDiagnostic.Point(selectedMain.GetEndPoint(0))+" end="+RoutingDiagnostic.Point(selectedMain.GetEndPoint(1)));
+            FamilyInstance diagnosticOwner = doc.GetElement(ownerId) as FamilyInstance;
+            foreach (Connector port in diagnosticOwner.MEPModel.ConnectorManager.Connectors)
+                if (port.Domain == Domain.DomainPiping)
+                    trace.Add("connector="+port.Id+" system="+port.PipeSystemType+" origin="+RoutingDiagnostic.Point(port.Origin)
+                        +" direction="+port.CoordinateSystem.BasisZ+" connected="+port.IsConnected);
+            var obstacles = ReadPipeObstacles(doc, supply, ret, trace).ToList();
             double minLength = Math.Max(doc.Application.ShortCurveTolerance, MM_TO_FEET);
             double[] earlyLeads = OutletLeadPlanner.BeforeObstacles(
                 new Point3D(origin.X, origin.Y, origin.Z), new Vector3D(direction.X, direction.Y, direction.Z),
-                ReadObstacleCorners(doc, supply, ret), leadLength,
+                ReadObstacleCorners(doc, supply, ret, trace), leadLength,
                 Math.Max(diameter / 2, connector.Radius), step, minLength);
+            trace.Add("earlyLeads(mm)="+string.Join(",",earlyLeads.Select(x=>(x*FEET_TO_MM).ToString("F3",System.Globalization.CultureInfo.InvariantCulture))));
             // 先尝试在已有供回水前转弯；保留原候选，因为包围盒可能保守地高估障碍。
             double[] leads = earlyLeads.Concat(Enumerable.Range(0, MaxCandidateStep + 1)
                 .Select(i => leadLength + i * step)).ToArray();
@@ -58,7 +72,33 @@ namespace FCUAutoDesign
                     {
                         double candidateDrop = drop + dropStep * step;
                         double candidateLateral = lateralStep * step;
+                        if (attempts >= MaxModelAttempts || trace.Clock.Elapsed.TotalSeconds >= 10)
+                        {
+                            lastReason = "达到诊断预算，停止新试建；未穷尽所有路线。";
+                            goto Finished;
+                        }
+                        screened++;
+                        Point3D[] prefix = LowerFlipRoutePlanner.Approach(
+                            new Point3D(origin.X, origin.Y, origin.Z), new Vector3D(direction.X,direction.Y,direction.Z),
+                            candidateLead,candidateDrop,candidateLateral,minLength);
+                        string blocked = null;
+                        foreach (PipeObstacle obstacle in obstacles)
+                        {
+                            for (int i=1;i<prefix.Length;i++)
+                                if (SegmentClearance.Distance(prefix[i-1],prefix[i],obstacle.Start,obstacle.End)
+                                    < obstacle.Radius + diameter/2 - minLength)
+                                { blocked="prefix segment="+i+" pipe="+obstacle.Id; break; }
+                            if (blocked != null) break;
+                        }
+                        if (blocked != null)
+                        {
+                            skipped++;
+                            trace.Add("PREFILTER "+blocked+" lead/drop/lateral(mm)="
+                                +RoutingDiagnostic.Point(new XYZ(candidateLead,candidateDrop,candidateLateral)));
+                            continue;
+                        }
                         attempts++;
+                        trace.Add("BUILD "+attempts+" lead/drop/lateral(mm)="+RoutingDiagnostic.Point(new XYZ(candidateLead,candidateDrop,candidateLateral)));
                         HashSet<int> originalRoles = new HashSet<int>(reporter.ElementRoles.Keys);
                         using (SubTransaction candidate = new SubTransaction(doc))
                         {
@@ -74,12 +114,14 @@ namespace FCUAutoDesign
                                     doc, current, currentMain, diameter, candidateDrop, candidateLead, true,
                                     "冷凝水", reporter, run, MEPSystemClassification.Sanitary,
                                     candidateLateral);
+                                trace.Add("BUILD returned");
                                 if (!connectionResult.BranchCreated || !connectionResult.TeeCreated)
                                     throw new InvalidOperationException(connectionResult.ErrorMessage ?? "冷凝水连接未完成。");
 
                                 doc.Regenerate();
                                 Verify(doc, connectionResult, supply, ret);
                                 batch?.VerifyNew(doc, connectionResult);
+                                trace.Add("VERIFY passed");
                                 if (candidate.Commit() != TransactionStatus.Committed)
                                     throw new InvalidOperationException("冷凝水避让候选未成功提交。");
 
@@ -88,6 +130,8 @@ namespace FCUAutoDesign
                                     result.ErrorMessage = $"冷凝水采用避让路径，预留段 {candidateLead * FEET_TO_MM:F0} mm，"
                                         + $"下翻高度 {candidateDrop * FEET_TO_MM:F0} mm，设备侧横移 {candidateLateral * FEET_TO_MM:F0} mm。"
                                         + (candidateLead < leadLength ? "根据已有供回水位置提前转弯，冷凝水首段短于供回水预留参数。" : "");
+                                result.ErrorMessage = trace.Finish(result.ErrorMessage+Environment.NewLine
+                                    +$"冷凝水诊断：预筛 {screened}，跳过 {skipped}，试建 {attempts}，耗时 {trace.Clock.Elapsed.TotalSeconds:F1} 秒；候选连接检查通过。");
                                 return result;
                             }
                             catch (Autodesk.Revit.Exceptions.RegenerationFailedException)
@@ -99,9 +143,11 @@ namespace FCUAutoDesign
                                 lastReason = $"预留 {candidateLead * FEET_TO_MM:F0} mm，下翻 {candidateDrop * FEET_TO_MM:F0} mm，"
                                     + $"设备侧横移 {candidateLateral * FEET_TO_MM:F0} mm：{ex.Message}";
                                 if (firstReason == null) firstReason = lastReason;
+                                trace.Add("FAIL "+lastReason);
                                 if (candidate.GetStatus() == TransactionStatus.Started
                                     && candidate.RollBack() != TransactionStatus.RolledBack)
                                     throw new InvalidOperationException("冷凝水候选回滚失败，必须取消整次操作。", ex);
+                                trace.Add("ROLLBACK complete");
                             }
                         }
                         foreach (int id in reporter.ElementRoles.Keys.Where(id => !originalRoles.Contains(id)).ToList())
@@ -116,16 +162,40 @@ namespace FCUAutoDesign
                 }
             }
 
+            Finished:
+            if (attempts == 0 && skipped == screened && screened > 0)
+                lastReason = "所有已检查候选前段均未通过中心线距离预筛，未进行 Revit 试建。";
             return new CondensateDrainResult
             {
-                ErrorMessage = $"{attempts} 条冷凝水避让候选均未通过接管与供回水干涉检查；未保留本次冷凝水操作。"
-                    + $"已加入 {earlyLeads.Length} 个障碍前转弯长度。首条原因：{firstReason}"
-                    + Environment.NewLine + $"最后原因：{lastReason}"
+                ErrorMessage = trace.Finish($"冷凝水诊断：预筛 {screened}，跳过 {skipped}，试建 {attempts}，耗时 {trace.Clock.Elapsed.TotalSeconds:F1} 秒；未完成，未保留本次冷凝水操作。"
+                    + $"已加入 {earlyLeads.Length} 个障碍前转弯长度。首条试建原因：{firstReason ?? "未进入试建"}"
+                    + Environment.NewLine + $"最后原因：{lastReason}；预筛仅检查已生成供回水直管，不能证明所有路线不可行。")
             };
         }
 
-        private static IEnumerable<Point3D[]> ReadObstacleCorners(Document doc,
-            TeeConnectionResult supply, TeeConnectionResult ret)
+        private sealed class PipeObstacle
+        {
+            public int Id;
+            public Point3D Start, End;
+            public double Radius;
+        }
+        private static IEnumerable<PipeObstacle> ReadPipeObstacles(Document doc,
+            TeeConnectionResult supply, TeeConnectionResult ret, RoutingDiagnostic trace)
+        {
+            foreach (ElementId id in ObstacleIds(supply,ret))
+            {
+                Pipe pipe = doc.GetElement(id) as Pipe;
+                Line line = (pipe?.Location as LocationCurve)?.Curve as Line;
+                if (line == null || !line.IsBound) continue;
+                XYZ a=line.GetEndPoint(0), b=line.GetEndPoint(1);
+                double radius=pipe.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM).AsDouble()/2;
+                trace.Add("pipe="+id.IntegerValue+" start="+RoutingDiagnostic.Point(a)+" end="+RoutingDiagnostic.Point(b)
+                    +" nominalRadius(mm)="+(radius*FEET_TO_MM).ToString("F3",System.Globalization.CultureInfo.InvariantCulture));
+                yield return new PipeObstacle { Id=id.IntegerValue,Start=new Point3D(a.X,a.Y,a.Z),End=new Point3D(b.X,b.Y,b.Z),Radius=radius };
+            }
+        }
+
+        private static HashSet<ElementId> ObstacleIds(TeeConnectionResult supply, TeeConnectionResult ret)
         {
             var ids = new HashSet<ElementId>();
             foreach (TeeConnectionResult circuit in new[] { supply, ret })
@@ -136,7 +206,12 @@ namespace FCUAutoDesign
                     circuit.MainPart1AdapterId, circuit.MainPart2AdapterId })
                     if (circuit.TeeCreated && id != null) ids.Add(id);
             }
-            foreach (ElementId id in ids)
+            return ids;
+        }
+        private static IEnumerable<Point3D[]> ReadObstacleCorners(Document doc,
+            TeeConnectionResult supply, TeeConnectionResult ret, RoutingDiagnostic trace)
+        {
+            foreach (ElementId id in ObstacleIds(supply,ret))
             {
                 BoundingBoxXYZ box = doc.GetElement(id)?.get_BoundingBox(null);
                 if (box == null) continue; // 缺盒时不建议缩短；最终实体验证仍执行。
@@ -148,6 +223,7 @@ namespace FCUAutoDesign
                     XYZ p = box.Transform.OfPoint(new XYZ(x == 0 ? box.Min.X : box.Max.X,
                         y == 0 ? box.Min.Y : box.Max.Y, z == 0 ? box.Min.Z : box.Max.Z));
                     corners.Add(new Point3D(p.X, p.Y, p.Z));
+                    trace.Add("box="+id.IntegerValue+" corner="+RoutingDiagnostic.Point(p));
                 }
                 yield return corners.ToArray();
             }

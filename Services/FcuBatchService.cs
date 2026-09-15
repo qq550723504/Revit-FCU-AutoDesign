@@ -35,6 +35,8 @@ namespace FCUAutoDesign
             string stopped = null;
             for (int i = 0; i < roomIds.Length; i++)
             {
+                if (i > 0 && options.EnableCondensate && stopped == null)
+                    stopped = "当前冷凝水诊断版仅执行首个房间，其余未执行；先检查首房间报告和诊断文件。";
                 if (stopped != null)
                 {
                     results[i].NotRun = true; results[i].Error = stopped; continue;

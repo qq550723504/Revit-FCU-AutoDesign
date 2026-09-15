@@ -36,7 +36,10 @@ namespace FCUAutoDesign
                 if (maxX + radius < 0 || minX - envelope > requestedLead
                     || minY > envelope || maxY < -envelope || minZ > envelope || maxZ < -envelope)
                     continue;
-                nearest = Math.Min(nearest, minX - radius - allowance);
+                // 邻近接口的大包围盒可能覆盖起点：它不能提供正的转弯长度，
+                // 但也不能抹掉其他障碍提供的候选。实际碰撞由后续检查处理。
+                double available = minX - radius - allowance;
+                if (available > minLength) nearest = Math.Min(nearest, available);
             }
             if (double.IsPositiveInfinity(nearest) || nearest <= minLength) return new double[0];
             double limit = Math.Min(nearest, requestedLead);

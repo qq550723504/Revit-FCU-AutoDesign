@@ -81,6 +81,9 @@ namespace FCUAutoDesign
             Check(ordered.SequenceEqual(reversed) && ordered[0]<leads[0],"Nearest obstacle limits lead independent of enumeration order");
             Check(OutletLeadPlanner.BeforeObstacles(start,dir,new[]{Box(.05,.1,-.02,.02,2.6,3.2)},.4,.01,.1,.001).Length==0,
                 "No positive room for turn does not invent zero or negative leads");
+            var overlapping=Box(-.02,.1,-.1,.1,2.95,3.05);
+            Check(OutletLeadPlanner.BeforeObstacles(start,dir,new[]{overlapping,obstacle},.4,.01,.1,.001).SequenceEqual(leads),
+                "Origin-overlapping box does not erase other early-turn suggestions; final collision checks still required");
             foreach(double angle in new[]{Math.PI/2,.73,Math.PI})
             {
                 Func<Point3D,Point3D> move=p=>P(100+p.X*Math.Cos(angle)-p.Y*Math.Sin(angle),

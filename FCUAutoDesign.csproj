@@ -96,6 +96,7 @@
     <Compile Include="Domain\EquipmentSelection\EquipmentSelectionCalculator.cs" />
     <Compile Include="Business\EquipmentCatalog\EquipmentCatalogMapping.cs" />
     <Compile Include="Business\Hydraulic\HydraulicTable.cs" />
+    <Compile Include="Business\DesignReconciliation\DesignReconciliation.cs" />
     <Compile Include="Presentation\BatchReportPresenter.cs" />
     <Compile Include="Presentation\ExecutionReportPresenter.cs" />
     <Compile Include="Presentation\CondensateMainPicker.cs" />

@@ -41,7 +41,7 @@ msbuild FCUAutoDesign.csproj /p:RevitVersion=2022 /p:RevitInstallPath="C:\Progra
 - `Services/FcuPlacementService.cs`：房间内定位、设备放置与出风接口朝向验证
 - `Services/HydronicConnectionService.cs`：供回水固定路径支管、弯头与三通接入
 - `Services/HydronicSeparationService.cs`：回水避让候选重试及供回水实体干涉检查
-- `Services/CondensateDrainService.cs`：冷凝水按实际标高连接的支管、主管打断与三通接入
+- `Services/CondensateSeparationService.cs`：冷凝水复用供回水固定路径，执行 Sanitary 系统的支管、主管打断与三通接入
 - `Services/FcuConnectorResolver.cs`、`Services/FcuTypeCatalog.cs`：设备接口识别和候选族类型查询
 - `Services/ConnectionChainVerifier.cs`：按指定接口与元素链验证连接关系
 - `Geometry/CondensateRoutePlanner.cs`：独立于 Revit 模型的重力排水路径计算

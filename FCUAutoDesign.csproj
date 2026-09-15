@@ -80,7 +80,6 @@
     <Compile Include="Services\FcuTypeCatalog.cs" />
     <Compile Include="Services\HydronicConnectionService.cs" />
     <Compile Include="Services\HydronicSeparationService.cs" />
-    <Compile Include="Services\CondensateDrainService.cs" />
     <Compile Include="Services\CondensateSeparationService.cs" />
     <Compile Include="Services\CircuitInterferenceVerifier.cs" />
     <Compile Include="Services\CondensateSystemPolicy.cs" />

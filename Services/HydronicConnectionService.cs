@@ -19,7 +19,8 @@ namespace FCUAutoDesign
             double valveClearance,
             bool enableTeeFitting,
             string circuit,
-            RollBackOnErrorPreprocessor failureReporter, MainPipeRun run = null)
+            RollBackOnErrorPreprocessor failureReporter, MainPipeRun run = null,
+            MEPSystemClassification? expectedClassificationOverride = null)
         {
             if (run != null)
                 mainPipe = run.Resolve(doc, fcuConn.Origin + fcuConn.CoordinateSystem.BasisZ * valveClearance);
@@ -28,8 +29,9 @@ namespace FCUAutoDesign
             ElementId pipeTypeId = mainPipe.PipeType.Id;
             ElementId systemTypeId = mainPipe.get_Parameter(BuiltInParameter.RBS_PIPING_SYSTEM_TYPE_PARAM)?.AsElementId();
             PipingSystemType systemType = systemTypeId == null ? null : doc.GetElement(systemTypeId) as PipingSystemType;
-            MEPSystemClassification expected = fcuConn.PipeSystemType == PipeSystemType.SupplyHydronic
-                ? MEPSystemClassification.SupplyHydronic : MEPSystemClassification.ReturnHydronic;
+            MEPSystemClassification expected = expectedClassificationOverride
+                ?? (fcuConn.PipeSystemType == PipeSystemType.SupplyHydronic
+                    ? MEPSystemClassification.SupplyHydronic : MEPSystemClassification.ReturnHydronic);
             if (systemType == null || systemType.SystemClassification != expected)
                 throw new InvalidOperationException($"{circuit}主管（元素 ID: {mainPipe.Id.IntegerValue}）系统分类不匹配："
                     + $"期望 {expected}，实际 {systemType?.SystemClassification.ToString() ?? "未指定"}。请重新选择正确系统的主管。");

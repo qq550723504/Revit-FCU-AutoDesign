@@ -127,7 +127,9 @@ namespace FCUAutoDesign
                         drainResult = condensate.Connect(
                             doc, conns.CondensateConnector, condensateMainPipe, room.Level.Id,
                             20 * MM_TO_FEET,
-                            failureReporter, supplyResult, returnResult, batch?.Condensate, batch);
+                            failureReporter, supplyResult, returnResult, batch?.Condensate, batch,
+                            options.ValveClearanceMm * MM_TO_FEET,
+                            options.FlipDropMm * MM_TO_FEET);
                         outcome.CondensateConnected = drainResult.Connected;
                         if (!string.IsNullOrEmpty(drainResult.ErrorMessage))
                             outcome.Warnings.Add("冷凝水管: " + drainResult.ErrorMessage);

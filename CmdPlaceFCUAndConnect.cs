@@ -141,9 +141,11 @@ namespace FCUAutoDesign
                     if (condensateMainPipe == null) return Result.Cancelled;
                 }
 
+                var batchClock = System.Diagnostics.Stopwatch.StartNew();
                 List<RoomExecutionResult> results = new FcuBatchService().Execute(doc, rooms,
                     supplyMainPipe, returnMainPipe, condensateMainPipe, options);
-                new BatchReportPresenter().Show(results, options);
+                batchClock.Stop();
+                new BatchReportPresenter().Show(results, options, batchClock.Elapsed);
                 // 部分房间失败不能以命令级 Failed 撤销已提交的其他房间。
                 if (results.Any(r => r.Design != null)) return Result.Succeeded;
                 message = "本批次没有房间完成布置，请查看各房间失败原因。";

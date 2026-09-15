@@ -7,15 +7,19 @@ namespace FCUAutoDesign
 {
     internal class BatchReportPresenter
     {
-        public void Show(IList<RoomExecutionResult> results, FcuDesignOptions options)
+        public void Show(IList<RoomExecutionResult> results, FcuDesignOptions options, System.TimeSpan elapsed)
         {
             StringBuilder summary = new StringBuilder();
             StringBuilder details = new StringBuilder();
+            string timing = $"整批执行耗时 {elapsed.TotalSeconds:F2} 秒（含设备放置、供回水、冷凝水及提交复核，不含选择与预览）。";
+            summary.AppendLine(timing);
+            details.AppendLine(timing);
             foreach (RoomExecutionResult room in results)
             {
                 string status = room.Status(options);
                 summary.AppendLine(room.RoomLabel + "：" + status);
                 details.AppendLine(room.RoomLabel + "：" + status);
+                if (!room.NotRun) details.AppendLine($"本房间执行耗时 {room.Elapsed.TotalSeconds:F2} 秒。");
                 if (room.Design != null)
                 {
                     ExecutionOutcome o = room.Design.Outcome;
@@ -35,7 +39,7 @@ namespace FCUAutoDesign
             TaskDialog dialog = new TaskDialog("FCU 多房间执行结果")
             {
                 MainInstruction = $"共 {results.Count} 间：连接完成 {complete}，部分完成 {partial}，失败 {failed}，未执行 {notRun}",
-                MainContent = results.Count <= 8 ? summary.ToString() : "展开详细信息查看各房间结果。",
+                MainContent = results.Count <= 8 ? summary.ToString() : timing + "展开详细信息查看各房间结果。",
                 ExpandedContent = details.ToString(),
                 FooterText = "仅验证模型连接及本批次管线实体干涉；未验证水力性能、排水坡度、保温和检修净距。"
             };

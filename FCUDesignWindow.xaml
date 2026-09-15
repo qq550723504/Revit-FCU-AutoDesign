@@ -74,7 +74,7 @@
 
 
                     <StackPanel IsEnabled="{Binding IsChecked, ElementName=ChkEnableCondensate}">
-                        <TextBlock Text="冷凝水诊断版仅执行首个房间并输出本地日志。遇供回水障碍可缩短首段；先预筛，最多试建 12 次，10 秒后不再启动新试建。" Foreground="#94a3b8" FontSize="11" TextWrapping="Wrap"/>
+                        <TextBlock Text="冷凝水逐房间执行并记录日志，遇未完成或失败暂停后续房间。每房间先预筛，最多试建 12 次，10 秒后不再启动新试建；遇障碍可缩短首段。" Foreground="#94a3b8" FontSize="11" TextWrapping="Wrap"/>
                     </StackPanel>
 
                     <!-- 功能控制开关 (已修复 XAML 转义与参数接通) -->

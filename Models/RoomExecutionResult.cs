@@ -6,6 +6,7 @@
         public FcuDesignResult Design { get; set; }
         public string Error { get; set; }
         public bool NotRun { get; set; }
+        public System.TimeSpan Elapsed { get; set; }
         public string Status(FcuDesignOptions options)
         {
             if (NotRun) return "未执行";

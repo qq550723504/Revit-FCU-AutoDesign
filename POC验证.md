@@ -228,3 +228,24 @@ powershell -NoProfile -STA -ExecutionPolicy Bypass -File tests\Verify-Dialog.ps1
 - NOT_RUN：恢复批量后的多房间连接与总耗时、失败预算触发与回滚复核、工程排水工况及人工净距验收。
 
 本次仅记录证据并增加回归，运行程序集仍为 5ec1e75；未解除单房间诊断限制。
+
+## 恢复受限批量验证
+
+在首房间实测通过后解除“只运行首房间”限制。开启冷凝水时，连接成功继续下一间；冷凝水未完成或房间异常则停止后续房间并标为未执行。每房间仍使用前段预筛、最多 12 次冷凝水试建、10 秒后不启动新试建的预算及唯一诊断日志。预算不是整房间硬超时。
+
+结果窗口新增每个已执行房间的计时（异常路径也记录）和整批计时，含设备放置、供回水、冷凝水及提交复核；不含选择/预览/结果窗口等待。未执行房间不显示虚假的执行耗时。
+
+本轮验证命令及输出：
+
+```powershell
+& 'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe' FCUAutoDesign.csproj /t:Rebuild /p:Configuration=Release /p:Platform=x64 /p:RevitVersion=2020 /nologo /verbosity:minimal
+# Exit 0; FCUAutoDesign -> bin\Release\FCUAutoDesign.dll
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File tests\Verify-Dialog.ps1 -AssemblyPath .\bin\Release\FCUAutoDesign.dll
+# 23 checks passed. Revit geometry/connection tests are NOT_RUN by this script.
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-MainPipeSegments.ps1
+# 14 segment checks passed. Revit batch integration tests are NOT_RUN.
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Verify-OutletLead.ps1
+# 24 outlet obstacle checks passed. Reproduced 261 blocked old candidates. Revit fitting/collision/rollback acceptance: NOT_RUN.
+```
+
+PASS：编译及上述 61 项本地检查。NOT_RUN：恢复后的多房间实际接管、暂停后续房间行为、整体耗时、已有主管连接复核和模型回滚。不能以首房间的 123/200 ms 冷凝水阶段结果代替批量性能证据。复测应从干净模型副本开始，避免在已完成房间上重复创建。

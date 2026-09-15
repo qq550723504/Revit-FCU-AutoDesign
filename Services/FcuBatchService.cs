@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
@@ -35,12 +36,11 @@ namespace FCUAutoDesign
             string stopped = null;
             for (int i = 0; i < roomIds.Length; i++)
             {
-                if (i > 0 && options.EnableCondensate && stopped == null)
-                    stopped = "当前冷凝水诊断版仅执行首个房间，其余未执行；先检查首房间报告和诊断文件。";
                 if (stopped != null)
                 {
                     results[i].NotRun = true; results[i].Error = stopped; continue;
                 }
+                Stopwatch roomClock = Stopwatch.StartNew();
                 try
                 {
                     // 每个房间在 FcuDesignService 内独立持有事务组，失败不登记管段。
@@ -49,6 +49,8 @@ namespace FCUAutoDesign
                         batch.Return?.AnySegment(doc), batch.Condensate?.AnySegment(doc), options, batch);
                     batch.Register(design);
                     results[i].Design = design;
+                    if (options.EnableCondensate && !design.Outcome.CondensateConnected)
+                        stopped = "前一房间冷凝水未完成，受限批量已停止后续房间；请检查该房间报告及诊断文件。";
                 }
                 catch (Autodesk.Revit.Exceptions.RegenerationFailedException ex)
                 {
@@ -63,7 +65,10 @@ namespace FCUAutoDesign
                 catch (Exception ex)
                 {
                     results[i].Error = ex.Message;
+                    if (options.EnableCondensate)
+                        stopped = "前一房间执行失败，受限批量已停止后续房间。";
                 }
+                finally { roomClock.Stop(); results[i].Elapsed = roomClock.Elapsed; }
             }
             return results;
         }

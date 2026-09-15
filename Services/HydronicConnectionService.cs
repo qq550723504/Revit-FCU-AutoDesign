@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Plumbing;
 using static FCUAutoDesign.RevitUnits;
@@ -196,14 +198,24 @@ namespace FCUAutoDesign
 
                     if (cMain1 != null && cMain2 != null && cBranch != null)
                     {
+                        HashSet<int> beforeTee = new HashSet<int>(new FilteredElementCollector(doc)
+                            .OfCategory(BuiltInCategory.OST_PipeFitting).WhereElementIsNotElementType()
+                            .ToElementIds().Select(id => id.IntegerValue));
                         FamilyInstance tee = doc.Create.NewTeeFitting(cMain1, cMain2, cBranch);
                         validateGeometry("三通生成");
 
                         if (tee == null)
                             throw new InvalidOperationException("Revit 未生成三通实例。");
+                        ElementId branchAdapter = CaptureTeeAdapter(cBranch, tee, beforeTee,
+                            failureReporter, circuit + "支管至三通过渡管件");
+                        if (branchAdapter != null) result.Chain.Add(branchAdapter);
                         result.Chain.Add(tee.Id);
                         result.MainPart1Id = mainPipe.Id;
                         result.MainPart2Id = mainPipePart2.Id;
+                        result.MainPart1AdapterId = CaptureTeeAdapter(cMain1, tee, beforeTee,
+                            failureReporter, circuit + "主管第一段至三通过渡管件");
+                        result.MainPart2AdapterId = CaptureTeeAdapter(cMain2, tee, beforeTee,
+                            failureReporter, circuit + "主管第二段至三通过渡管件");
                         result.TeeCreated = true;
                         if (!verifier.VerifyConnectionChain(doc, result))
                             throw new InvalidOperationException("三通与两段主管或上游支管未全部连通。");
@@ -240,6 +252,40 @@ namespace FCUAutoDesign
             }
 
             return result;
+        }
+
+        private static ElementId CaptureTeeAdapter(Connector pipeEnd, FamilyInstance tee,
+            HashSet<int> existing, RollBackOnErrorPreprocessor reporter, string role)
+        {
+            List<Connector> teeEnds = tee.MEPModel.ConnectorManager.Connectors.Cast<Connector>()
+                .Where(c => c.Domain == Domain.DomainPiping && c.ConnectorType == ConnectorType.End).ToList();
+            if (teeEnds.Any(c => pipeEnd.IsConnectedTo(c))) return null;
+            List<FamilyInstance> adapters = teeEnds.Select(c => FindNewAdapter(pipeEnd, c, existing))
+                .Where(f => f != null).GroupBy(f => f.Id.IntegerValue).Select(g => g.First()).ToList();
+            if (adapters.Count != 1)
+                throw new InvalidOperationException($"{role}识别失败：管道 {pipeEnd.Owner.Id.IntegerValue} 接口 {pipeEnd.Id}"
+                    + $" 与三通 {tee.Id.IntegerValue} 未直接连通，也未经过本次生成的唯一两端过渡管件。");
+            reporter.ElementRoles[adapters[0].Id.IntegerValue] = role;
+            return adapters[0].Id;
+        }
+
+        private static FamilyInstance FindNewAdapter(Connector source, Connector target, HashSet<int> existing)
+        {
+            List<FamilyInstance> candidates = source.AllRefs.Cast<Connector>()
+                .Where(c => c.Domain == Domain.DomainPiping && c.ConnectorType == ConnectorType.End
+                    && source.IsConnectedTo(c))
+                .Select(c => c.Owner).OfType<FamilyInstance>()
+                .Where(f => f.Category != null && f.Category.Id.IntegerValue == (int)BuiltInCategory.OST_PipeFitting
+                    && !existing.Contains(f.Id.IntegerValue))
+                .GroupBy(f => f.Id.IntegerValue).Select(g => g.First())
+                .Where(f =>
+                {
+                    List<Connector> ends = f.MEPModel.ConnectorManager.Connectors.Cast<Connector>()
+                        .Where(c => c.Domain == Domain.DomainPiping && c.ConnectorType == ConnectorType.End).ToList();
+                    return ends.Count == 2 && ends.All(c => c.IsConnected)
+                        && ends.Any(c => c.IsConnectedTo(source)) && ends.Any(c => c.IsConnectedTo(target));
+                }).ToList();
+            return candidates.Count == 1 ? candidates[0] : null;
         }
 
         private FamilyInstance ConnectPipesWithElbow(Document doc, Connector c1, Connector c2)

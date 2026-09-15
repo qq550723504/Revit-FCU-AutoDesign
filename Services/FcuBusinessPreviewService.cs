@@ -30,7 +30,7 @@ namespace FCUAutoDesign
             List<string> lines = new List<string>();
             foreach (Room room in rooms)
             {
-                RoomRuleSnapshot snapshot = roomReader.Read(room);
+                RoomRuleSnapshot snapshot = roomReader.Read(doc, room);
                 if (!snapshot.IsValid)
                 {
                     TaskDialog.Show("FCU-201 预览无法计算",

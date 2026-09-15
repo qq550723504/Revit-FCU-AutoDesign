@@ -20,11 +20,23 @@ namespace FCUAutoDesign
     {
         private const double ToleranceFeet = 1.0 / 304.8;
 
-        public RoomRuleSnapshot Read(Room room)
+        public RoomRuleSnapshot Read(Document doc, Room room)
         {
             RoomRuleSnapshot result = new RoomRuleSnapshot();
             if (room == null || room.Level == null)
                 return Fail(result, "房间或房间标高无效。");
+
+            FamilyInstance door = FindDoorForRoom(doc, room);
+            Wall doorWall = door == null ? null : door.Host as Wall;
+            Line doorWallLine = doorWall == null
+                ? null
+                : (doorWall.Location as LocationCurve)?.Curve as Line;
+            if (doorWallLine == null)
+                return Fail(result, "需要房间唯一关联门及其所在的水平直墙；门所在墙方向定义 L 轴。");
+            XYZ doorAxis = new XYZ(doorWallLine.Direction.X, doorWallLine.Direction.Y, 0);
+            if (doorAxis.GetLength() <= ToleranceFeet)
+                return Fail(result, "无法从门所在墙确定 L 轴。");
+            doorAxis = doorAxis.Normalize();
 
             IList<IList<BoundarySegment>> loops = room.GetBoundarySegments(
                 new SpatialElementBoundaryOptions());
@@ -40,10 +52,7 @@ namespace FCUAutoDesign
             if (curves.Any(x => !(x is Line)))
                 return Fail(result, "房间包含弧形边界，当前规则预览要求人工确认 L/H。");
 
-            Line first = curves.Cast<Line>().FirstOrDefault(x => x.Length > ToleranceFeet);
-            if (first == null)
-                return Fail(result, "房间边界没有有效直线。");
-            XYZ axis = new XYZ(first.Direction.X, first.Direction.Y, 0).Normalize();
+            XYZ axis = doorAxis;
             XYZ perpendicular = XYZ.BasisZ.CrossProduct(axis).Normalize();
             List<XYZ> points = curves.SelectMany(x => new[] { x.GetEndPoint(0), x.GetEndPoint(1) }).ToList();
             double minAxis = points.Min(x => x.DotProduct(axis));
@@ -66,10 +75,29 @@ namespace FCUAutoDesign
             }
 
             result.IsValid = true;
-            result.LengthM = Math.Max(axisLength, perpendicularLength) * FEET_TO_MM / 1000.0;
-            result.WidthM = Math.Min(axisLength, perpendicularLength) * FEET_TO_MM / 1000.0;
+            // L is defined by the wall hosting the room's door, regardless of which
+            // room dimension is longer. H is the perpendicular room dimension.
+            result.LengthM = axisLength * FEET_TO_MM / 1000.0;
+            result.WidthM = perpendicularLength * FEET_TO_MM / 1000.0;
             result.BaseElevationM = room.Level.Elevation * FEET_TO_MM / 1000.0;
             return result;
+        }
+
+        private static FamilyInstance FindDoorForRoom(Document doc, Room room)
+        {
+            if (doc == null) return null;
+            List<FamilyInstance> doors = new FilteredElementCollector(doc)
+                .OfCategory(BuiltInCategory.OST_Doors)
+                .OfClass(typeof(FamilyInstance))
+                .Cast<FamilyInstance>()
+                .Where(door =>
+                    (door.Room != null && door.Room.Id == room.Id)
+                    || (door.ToRoom != null && door.ToRoom.Id == room.Id)
+                    || (door.FromRoom != null && door.FromRoom.Id == room.Id))
+                .ToList();
+            if (doors.Count != 1)
+                return null;
+            return doors[0];
         }
 
         private static bool Near(double left, double right)

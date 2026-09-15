@@ -20,7 +20,7 @@ namespace FCUAutoDesign
             double baseLevelElev = room.Level.Elevation;
             double fcuAbsoluteZ = baseLevelElev + (options.FcuElevationMm * MM_TO_FEET);
 
-            FamilyInstance door = FindDoorForRoom(doc, room);
+            FamilyInstance door = FindDoorForRoom(doc, room, options);
             Wall doorWall = door?.Host as Wall;
             Line doorWallLine = (doorWall?.Location as LocationCurve)?.Curve as Line;
             if (doorWallLine == null)
@@ -97,8 +97,18 @@ namespace FCUAutoDesign
             return new FcuPlacementResult { Instance = fcu, Point = placePoint, ExpectedOutletDirection = expectedOutletDirection };
         }
 
-        private FamilyInstance FindDoorForRoom(Document doc, Room room)
+        private FamilyInstance FindDoorForRoom(Document doc, Room room, FcuDesignOptions options)
         {
+            ElementId selectedDoorId;
+            if (options != null && options.SelectedDoorIds != null
+                && options.SelectedDoorIds.TryGetValue(room.Id.IntegerValue, out selectedDoorId))
+            {
+                FamilyInstance selectedDoor = doc.GetElement(selectedDoorId) as FamilyInstance;
+                if (!RoomRuleSnapshotReader.BelongsToRoom(selectedDoor, room))
+                    throw new InvalidOperationException("所选目标门不属于当前房间，无法确定 L 轴。");
+                return selectedDoor;
+            }
+
             FilteredElementCollector collector = new FilteredElementCollector(doc)
                 .OfCategory(BuiltInCategory.OST_Doors)
                 .OfClass(typeof(FamilyInstance));
@@ -108,7 +118,7 @@ namespace FCUAutoDesign
                 || (door.ToRoom != null && door.ToRoom.Id == room.Id)
                 || (door.FromRoom != null && door.FromRoom.Id == room.Id)).ToList();
             if (doors.Count > 1)
-                throw new InvalidOperationException("房间关联了多个门，无法唯一确定门侧墙面。当前 PoC 请使用单门房间验证；多门房间需要增加目标门选择。");
+                throw new InvalidOperationException("房间关联了多个门，请先拾取作为 L 侧的目标门。");
             return doors.SingleOrDefault();
         }
 

@@ -30,7 +30,14 @@ namespace FCUAutoDesign
             List<string> lines = new List<string>();
             foreach (Room room in rooms)
             {
-                RoomRuleSnapshot snapshot = roomReader.Read(doc, room);
+                FamilyInstance selectedDoor = null;
+                ElementId selectedDoorId;
+                if (options.SelectedDoorIds != null
+                    && options.SelectedDoorIds.TryGetValue(room.Id.IntegerValue, out selectedDoorId))
+                {
+                    selectedDoor = doc.GetElement(selectedDoorId) as FamilyInstance;
+                }
+                RoomRuleSnapshot snapshot = roomReader.Read(doc, room, selectedDoor);
                 if (!snapshot.IsValid)
                 {
                     TaskDialog.Show("FCU-201 预览无法计算",

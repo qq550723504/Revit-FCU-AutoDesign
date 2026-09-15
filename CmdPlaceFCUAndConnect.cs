@@ -60,6 +60,7 @@ namespace FCUAutoDesign
                     CoolingIndexWPerSquareMeter = uiWindow.CoolingIndexWPerSquareMeter,
                     EnableAutoSizing = uiWindow.EnableAutoSizing,
                     EnableBusinessRulePreview = uiWindow.EnableBusinessRulePreview,
+                    SelectedDoorIds = new Dictionary<int, ElementId>(),
                     EnableReturnPipe = uiWindow.EnableReturnPipe,
                     EnableCondensate = uiWindow.EnableCondensate,
                     BreakCurveAndTee = uiWindow.BreakCurveAndTee
@@ -70,11 +71,34 @@ namespace FCUAutoDesign
                 // =========================================================================
                 int totalSteps = 2 + (options.EnableReturnPipe ? 1 : 0) + (options.EnableCondensate ? 1 : 0);
                 IList<Reference> roomRefs = uidoc.Selection.PickObjects(ObjectType.Element, new RoomFilter(),
-                    $"【步骤 1/{totalSteps}】请选择同楼层房间，选完点击“完成”（每间须为单门房间）");
+                    $"【步骤 1/{totalSteps}】请选择同楼层房间，选完点击“完成”（多门房间随后指定目标门）");
                 List<Room> rooms = roomRefs.Select(r => doc.GetElement(r) as Room)
                     .Where(r => r != null).GroupBy(r => r.Id.IntegerValue).Select(g => g.First()).ToList();
                 if (rooms.Count == 0) return Result.Cancelled;
                 FcuBatchService.ValidateRooms(rooms);
+
+                // 多门房间不能靠几何或门序号猜测 L 轴。让用户明确指定目标门，
+                // 并把同一选择传给业务预览和后续放置流程。
+                foreach (Room room in rooms)
+                {
+                    List<FamilyInstance> doors = RoomRuleSnapshotReader.FindDoors(doc, room);
+                    if (doors.Count == 1)
+                    {
+                        options.SelectedDoorIds[room.Id.IntegerValue] = doors[0].Id;
+                    }
+                    else if (doors.Count > 1)
+                    {
+                        Reference doorRef = uidoc.Selection.PickObject(
+                            ObjectType.Element,
+                            new RoomDoorFilter(doc, room.Id),
+                            "房间 " + (room.Number ?? room.Id.IntegerValue.ToString())
+                            + " 有多个门，请拾取作为 L 侧的目标门");
+                        FamilyInstance selectedDoor = doc.GetElement(doorRef) as FamilyInstance;
+                        if (selectedDoor == null || !RoomRuleSnapshotReader.BelongsToRoom(selectedDoor, room))
+                            throw new InvalidOperationException("所选目标门不属于当前房间。");
+                        options.SelectedDoorIds[room.Id.IntegerValue] = selectedDoor.Id;
+                    }
+                }
 
                 if (options.EnableBusinessRulePreview)
                 {

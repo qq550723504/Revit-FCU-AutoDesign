@@ -69,6 +69,7 @@
     <Compile Include="Infrastructure\RollBackOnErrorPreprocessor.cs" />
     <Compile Include="Infrastructure\RoomFilter.cs" />
     <Compile Include="Infrastructure\PipeFilter.cs" />
+    <Compile Include="Infrastructure\RoomDoorFilter.cs" />
     <Compile Include="Models\FcuDesignOptions.cs" />
     <Compile Include="Models\FcuDesignResult.cs" />
     <Compile Include="Models\FcuPlacementResult.cs" />

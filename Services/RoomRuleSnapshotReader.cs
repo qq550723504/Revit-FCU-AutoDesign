@@ -20,13 +20,15 @@ namespace FCUAutoDesign
     {
         private const double ToleranceFeet = 1.0 / 304.8;
 
-        public RoomRuleSnapshot Read(Document doc, Room room)
+        public RoomRuleSnapshot Read(Document doc, Room room, FamilyInstance selectedDoor = null)
         {
             RoomRuleSnapshot result = new RoomRuleSnapshot();
             if (room == null || room.Level == null)
                 return Fail(result, "房间或房间标高无效。");
 
-            FamilyInstance door = FindDoorForRoom(doc, room);
+            FamilyInstance door = selectedDoor ?? FindDoorForRoom(doc, room);
+            if (selectedDoor != null && !BelongsToRoom(selectedDoor, room))
+                return Fail(result, "所选门不属于当前房间。");
             Wall doorWall = door == null ? null : door.Host as Wall;
             Line doorWallLine = doorWall == null
                 ? null
@@ -85,8 +87,16 @@ namespace FCUAutoDesign
 
         private static FamilyInstance FindDoorForRoom(Document doc, Room room)
         {
-            if (doc == null) return null;
-            List<FamilyInstance> doors = new FilteredElementCollector(doc)
+            List<FamilyInstance> doors = FindDoors(doc, room);
+            if (doors.Count != 1)
+                return null;
+            return doors[0];
+        }
+
+        internal static List<FamilyInstance> FindDoors(Document doc, Room room)
+        {
+            if (doc == null || room == null) return new List<FamilyInstance>();
+            return new FilteredElementCollector(doc)
                 .OfCategory(BuiltInCategory.OST_Doors)
                 .OfClass(typeof(FamilyInstance))
                 .Cast<FamilyInstance>()
@@ -95,9 +105,14 @@ namespace FCUAutoDesign
                     || (door.ToRoom != null && door.ToRoom.Id == room.Id)
                     || (door.FromRoom != null && door.FromRoom.Id == room.Id))
                 .ToList();
-            if (doors.Count != 1)
-                return null;
-            return doors[0];
+        }
+
+        internal static bool BelongsToRoom(FamilyInstance door, Room room)
+        {
+            return door != null && room != null
+                && ((door.Room != null && door.Room.Id == room.Id)
+                    || (door.ToRoom != null && door.ToRoom.Id == room.Id)
+                    || (door.FromRoom != null && door.FromRoom.Id == room.Id));
         }
 
         private static bool Near(double left, double right)

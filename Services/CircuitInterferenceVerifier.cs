@@ -26,9 +26,22 @@ namespace FCUAutoDesign
                 {
                     Element collision = collector.WherePasses(filter).FirstElement();
                     if (collision != null)
-                        throw new InvalidOperationException($"{firstName}元素 {id.IntegerValue} 与{secondName}元素 {collision.Id.IntegerValue} 实体相交。");
+                        throw new InvalidOperationException(
+                            $"{firstName}{Role(first, id)}元素 {id.IntegerValue} 与{secondName}{Role(second, collision.Id)}元素 "
+                            + $"{collision.Id.IntegerValue} 实体相交。");
                 }
             }
+        }
+
+        private static string Role(TeeConnectionResult result, ElementId id)
+        {
+            if (result != null && result.TeeCreated)
+            {
+                if (id == result.MainPart1Id || id == result.MainPart2Id) return "主管";
+                if (id == result.MainPart1AdapterId || id == result.MainPart2AdapterId) return "主管过渡管件";
+            }
+            if (result != null && result.Chain.Any(x => x == id)) return "支管/管件";
+            return "元素";
         }
 
         private static List<ElementId> Elements(TeeConnectionResult result, bool includeMains)

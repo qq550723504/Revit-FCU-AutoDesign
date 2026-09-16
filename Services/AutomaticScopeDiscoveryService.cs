@@ -25,6 +25,27 @@ namespace FCUAutoDesign
         public ISet<int> CoveredRoomIds { get; } = new HashSet<int>();
         public int TotalRoomCount { get; set; }
         public string Label { get; set; }
+        public IList<PipeRunCandidate> Runs { get; } = new List<PipeRunCandidate>();
+    }
+
+    internal sealed class PipeRunCandidate
+    {
+        public Pipe Pipe { get; set; }
+        public ISet<int> CoveredRoomIds { get; } = new HashSet<int>();
+    }
+
+    internal sealed class AutomaticScopeZone
+    {
+        public Pipe Supply { get; set; }
+        public Pipe Return { get; set; }
+        public Pipe Condensate { get; set; }
+        public IList<Room> Rooms { get; } = new List<Room>();
+    }
+
+    internal sealed class AutomaticZoneResult
+    {
+        public IList<AutomaticScopeZone> Zones { get; } = new List<AutomaticScopeZone>();
+        public IList<string> Rejections { get; } = new List<string>();
     }
 
     internal sealed class AutomaticScopeDiscoveryService
@@ -129,10 +150,26 @@ namespace FCUAutoDesign
                 }).ToList();
                 runs.Add(key, Tuple.Create(representative, segments));
             }
+            Dictionary<int, double> roomReach = rooms.ToDictionary(room => room.Id.IntegerValue,
+                room => AutomaticPipeReach(room, view, familyPlanExtent));
+            Dictionary<int, List<Tuple<Pipe, double>>> eligibleByRoom = roomApproaches.ToDictionary(
+                room => room.Key, room => runs.Values.Select(run => Tuple.Create(run.Item1,
+                    LinearMainCandidateSelector.MaximumPerpendicularDistance(
+                        run.Item2, room.Value, endpointTolerance)))
+                    .Where(x => x.Item2.HasValue && x.Item2.Value <= roomReach[room.Key])
+                    .Select(x => Tuple.Create(x.Item1, x.Item2.Value)).ToList());
+            double equalDistanceTolerance = Math.Max(doc.Application.ShortCurveTolerance, RevitUnits.MM_TO_FEET);
             List<Tuple<Pipe, IList<int>>> scored = runs.Values.Select(run => Tuple.Create(run.Item1,
-                (IList<int>)roomApproaches.Where(room => room.Value.Count > 0
-                    && LinearMainCandidateSelector.CoversAll(run.Item2, room.Value, endpointTolerance))
+                (IList<int>)eligibleByRoom.Where(room => room.Value.Count > 0
+                    && room.Value.Where(x => x.Item2 <= room.Value.Min(y => y.Item2) + equalDistanceTolerance)
+                        .Any(x => x.Item1.Id == run.Item1.Id))
                     .Select(room => room.Key).ToList())).ToList();
+            foreach (Tuple<Pipe, IList<int>> run in scored.Where(x => x.Item2.Count > 0))
+            {
+                PipeRunCandidate candidate = new PipeRunCandidate { Pipe = run.Item1 };
+                foreach (int roomId in run.Item2) candidate.CoveredRoomIds.Add(roomId);
+                result.Runs.Add(candidate);
+            }
             int bestCoverage = scored.Count == 0 ? 0 : scored.Max(x => x.Item2.Count);
             foreach (Tuple<Pipe, IList<int>> run in scored.Where(x => x.Item2.Count == bestCoverage && bestCoverage > 0))
                 result.EligiblePipes.Add(run.Item1);
@@ -143,6 +180,94 @@ namespace FCUAutoDesign
                     result.CoveredRoomIds.Add(roomId);
             }
             return result;
+        }
+
+        public AutomaticZoneResult BuildZones(IList<Room> rooms, PipeDiscoveryResult supply,
+            PipeDiscoveryResult returnResult, PipeDiscoveryResult condensate, FcuDesignOptions options)
+        {
+            AutomaticZoneResult result = new AutomaticZoneResult();
+            Dictionary<string, AutomaticScopeZone> zones = new Dictionary<string, AutomaticScopeZone>();
+            foreach (Room room in rooms)
+            {
+                List<PipeRunCandidate> supplyRuns = Covering(supply, room);
+                List<PipeRunCandidate> returnRuns = options.EnableReturnPipe ? Covering(returnResult, room) : new List<PipeRunCandidate>();
+                List<PipeRunCandidate> drainRuns = options.EnableCondensate ? Covering(condensate, room) : new List<PipeRunCandidate>();
+                bool valid = supplyRuns.Count == 1
+                    && (!options.EnableReturnPipe || returnRuns.Count == 1)
+                    && (!options.EnableCondensate || drainRuns.Count == 1);
+                if (!valid)
+                {
+                    result.Rejections.Add(room.Number + " " + room.Name + "："
+                        + CoverageReason("供水", supplyRuns.Count)
+                        + (options.EnableReturnPipe ? "；" + CoverageReason("回水", returnRuns.Count) : string.Empty)
+                        + (options.EnableCondensate ? "；" + CoverageReason("冷凝水", drainRuns.Count) : string.Empty));
+                    continue;
+                }
+                Pipe supplyPipe = supplyRuns[0].Pipe;
+                Pipe returnPipe = options.EnableReturnPipe ? returnRuns[0].Pipe : null;
+                Pipe drainPipe = options.EnableCondensate ? drainRuns[0].Pipe : null;
+                string key = supplyPipe.UniqueId + "|" + (returnPipe?.UniqueId ?? string.Empty)
+                    + "|" + (drainPipe?.UniqueId ?? string.Empty);
+                AutomaticScopeZone zone;
+                if (!zones.TryGetValue(key, out zone))
+                {
+                    zone = new AutomaticScopeZone { Supply = supplyPipe, Return = returnPipe, Condensate = drainPipe };
+                    zones.Add(key, zone);
+                }
+                zone.Rooms.Add(room);
+            }
+            foreach (AutomaticScopeZone zone in zones.Values) result.Zones.Add(zone);
+            return result;
+        }
+
+        public bool? ConfirmZones(AutomaticZoneResult result)
+        {
+            if (result.Zones.Count == 0)
+            {
+                TaskDialog.Show("未形成自动主管区域", string.Join(Environment.NewLine, result.Rejections)
+                    + Environment.NewLine + "将改为手动选择。");
+                return false;
+            }
+            StringBuilder content = new StringBuilder();
+            for (int i = 0; i < result.Zones.Count; i++)
+            {
+                AutomaticScopeZone zone = result.Zones[i];
+                content.AppendLine("区域 " + (i + 1) + "：" + zone.Rooms.Count + " 个房间；供水 ID "
+                    + zone.Supply.Id.IntegerValue
+                    + (zone.Return == null ? string.Empty : "，回水 ID " + zone.Return.Id.IntegerValue)
+                    + (zone.Condensate == null ? string.Empty : "，冷凝水 ID " + zone.Condensate.Id.IntegerValue));
+            }
+            TaskDialog dialog = new TaskDialog("自动主管区域确认")
+            {
+                MainInstruction = "发现 " + result.Zones.Count + " 个独立横向主管区域",
+                MainContent = content.ToString(),
+                ExpandedContent = string.Join(Environment.NewLine, result.Rejections.Select(x => "排除：" + x)),
+                FooterText = "各区域独立执行，不会生成连接不同区域的主管。",
+                CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No | TaskDialogCommonButtons.Cancel,
+                DefaultButton = TaskDialogResult.No
+            };
+            TaskDialogResult choice = dialog.Show();
+            return choice == TaskDialogResult.Cancel ? (bool?)null : choice == TaskDialogResult.Yes;
+        }
+
+        private static List<PipeRunCandidate> Covering(PipeDiscoveryResult result, Room room)
+        {
+            return result == null ? new List<PipeRunCandidate>()
+                : result.Runs.Where(x => x.CoveredRoomIds.Contains(room.Id.IntegerValue)).ToList();
+        }
+
+        private static string CoverageReason(string label, int count)
+        {
+            return count == 0 ? label + "主管未覆盖" : count == 1 ? label + "主管已确定" : label + "主管归属不唯一";
+        }
+
+        private static double AutomaticPipeReach(Room room, View view, double familyPlanExtent)
+        {
+            BoundingBoxXYZ bounds = room.get_BoundingBox(view) ?? room.get_BoundingBox(null);
+            if (bounds == null) return familyPlanExtent;
+            double width = bounds.Max.X - bounds.Min.X;
+            double depth = bounds.Max.Y - bounds.Min.Y;
+            return Math.Sqrt(width * width + depth * depth) + familyPlanExtent;
         }
 
         public bool? ConfirmRooms(RoomDiscoveryResult discovery)

@@ -27,10 +27,19 @@ namespace FCUAutoDesign
             var endpoint = LinearMainCandidateSelector.Select(new List<LinearMainCandidate> { Candidate("main",0,10) },
                 new List<Point3D> { new Point3D(0,2,0) }, .01);
             Check(endpoint.UniqueCandidateId == null, "Room projection at pipe endpoint is rejected");
-            var keywords = Business.RoomSelection.RoomNameKeywordPolicy.Parse("会议室; 办公室，会议室");
-            Check(keywords.Count == 2 && Business.RoomSelection.RoomNameKeywordPolicy.Matches("大会议室 01", keywords),
+            var topDistance = LinearMainCandidateSelector.MaximumPerpendicularDistance(
+                new[] { Candidate("top",0,10,10) }, new[] { new Point3D(5,9,0) }, .01);
+            var bottomDistance = LinearMainCandidateSelector.MaximumPerpendicularDistance(
+                new[] { Candidate("bottom",0,10,0) }, new[] { new Point3D(5,9,0) }, .01);
+            Check(topDistance.HasValue && bottomDistance.HasValue && topDistance.Value < bottomDistance.Value,
+                "Nearest disconnected horizontal run can be selected by perpendicular distance");
+            var outsideLength = LinearMainCandidateSelector.MaximumPerpendicularDistance(
+                new[] { Candidate("short",0,4,10) }, new[] { new Point3D(5,9,0) }, .01);
+            Check(!outsideLength.HasValue, "A nearby run outside its usable length does not cover the room");
+            var keywords = Business.RoomSelection.RoomNameKeywordPolicy.Parse("\u4F1A\u8BAE\u5BA4; \u529E\u516C\u5BA4\uFF0C\u4F1A\u8BAE\u5BA4");
+            Check(keywords.Count == 2 && Business.RoomSelection.RoomNameKeywordPolicy.Matches("\u5927\u4F1A\u8BAE\u5BA4 01", keywords),
                 "Configured room name keywords use contains matching");
-            Check(!Business.RoomSelection.RoomNameKeywordPolicy.Matches("卫生间", keywords),
+            Check(!Business.RoomSelection.RoomNameKeywordPolicy.Matches("\u536B\u751F\u95F4", keywords),
                 "Non-target room name is excluded");
             Console.WriteLine(count + " automatic scope checks passed. Revit view discovery is NOT_RUN.");
         }

@@ -45,15 +45,44 @@ namespace FCUAutoDesign
             return approaches.All(point => values.Any(candidate => Covers(candidate, point, endpointTolerance)));
         }
 
+        public static double? MaximumPerpendicularDistance(IEnumerable<LinearMainCandidate> segments,
+            IEnumerable<Point3D> approaches, double endpointTolerance)
+        {
+            List<LinearMainCandidate> values = segments.Where(x => x != null).ToList();
+            List<Point3D> points = approaches.ToList();
+            if (values.Count == 0 || points.Count == 0) return null;
+            double maximum = 0;
+            foreach (Point3D point in points)
+            {
+                List<double> distances = values.Select(candidate => PerpendicularDistance(
+                    candidate, point, endpointTolerance)).Where(x => x.HasValue)
+                    .Select(x => x.Value).ToList();
+                if (distances.Count == 0) return null;
+                maximum = Math.Max(maximum, distances.Min());
+            }
+            return maximum;
+        }
+
         private static bool Covers(LinearMainCandidate candidate, Point3D point, double endpointTolerance)
+        {
+            return PerpendicularDistance(candidate, point, endpointTolerance).HasValue;
+        }
+
+        private static double? PerpendicularDistance(LinearMainCandidate candidate, Point3D point,
+            double endpointTolerance)
         {
             Vector3D axis = candidate.End - candidate.Start;
             double lengthSquared = axis.X * axis.X + axis.Y * axis.Y;
-            if (lengthSquared <= endpointTolerance * endpointTolerance) return false;
+            if (lengthSquared <= endpointTolerance * endpointTolerance) return null;
             double length = Math.Sqrt(lengthSquared);
             double t = ((point.X - candidate.Start.X) * axis.X
                 + (point.Y - candidate.Start.Y) * axis.Y) / lengthSquared;
-            return t * length > endpointTolerance && (1 - t) * length > endpointTolerance;
+            if (t * length <= endpointTolerance || (1 - t) * length <= endpointTolerance) return null;
+            double projectionX = candidate.Start.X + t * axis.X;
+            double projectionY = candidate.Start.Y + t * axis.Y;
+            double offsetX = point.X - projectionX;
+            double offsetY = point.Y - projectionY;
+            return Math.Sqrt(offsetX * offsetX + offsetY * offsetY);
         }
     }
 }

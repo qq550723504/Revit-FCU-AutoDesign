@@ -129,6 +129,7 @@ namespace FCUAutoDesign
 
                 PipeDiscoveryResult supplyDiscovery = null, returnDiscovery = null, drainDiscovery = null;
                 bool useAutomaticPipes = false;
+                List<AutomaticScopeZone> automaticZones = null;
                 if (options.EnableAutomaticScopeDiscovery)
                 {
                     supplyDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
@@ -139,24 +140,15 @@ namespace FCUAutoDesign
                     if (options.EnableCondensate)
                         drainDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
                             MEPSystemClassification.Sanitary, "冷凝水主管");
-                    List<PipeDiscoveryResult> pipeDiscoveries =
-                        new[] { supplyDiscovery, returnDiscovery, drainDiscovery }.Where(x => x != null).ToList();
-                    bool? useDiscoveredPipes = discoveryService.ConfirmPipes(pipeDiscoveries, rooms);
-                    if (!useDiscoveredPipes.HasValue) return Result.Cancelled;
-                    useAutomaticPipes = useDiscoveredPipes.Value;
+                    AutomaticZoneResult zoneResult = discoveryService.BuildZones(
+                        rooms, supplyDiscovery, returnDiscovery, drainDiscovery, options);
+                    bool? useDiscoveredZones = discoveryService.ConfirmZones(zoneResult);
+                    if (!useDiscoveredZones.HasValue) return Result.Cancelled;
+                    useAutomaticPipes = useDiscoveredZones.Value;
                     if (useAutomaticPipes)
                     {
-                        List<PipeDiscoveryResult> resolved = pipeDiscoveries.Where(x => x.UniquePipe != null).ToList();
-                        if (resolved.Count > 0)
-                        {
-                            rooms = rooms.Where(room => resolved.All(x =>
-                                x.CoveredRoomIds.Contains(room.Id.IntegerValue))).ToList();
-                            if (rooms.Count == 0)
-                            {
-                                TaskDialog.Show("自动范围为空", "供水、回水和冷凝水主管没有共同覆盖的目标房间。");
-                                return Result.Cancelled;
-                            }
-                        }
+                        automaticZones = zoneResult.Zones.ToList();
+                        rooms = automaticZones.SelectMany(x => x.Rooms).ToList();
                     }
                 }
 
@@ -180,7 +172,7 @@ namespace FCUAutoDesign
                         return Result.Cancelled;
                 }
 
-                Pipe supplyMainPipe = useAutomaticPipes ? supplyDiscovery?.UniquePipe : null;
+                Pipe supplyMainPipe = automaticZones == null ? null : automaticZones[0].Supply;
                 if (supplyMainPipe == null)
                 {
                     Reference supplyRef = uidoc.Selection.PickObject(ObjectType.Element,
@@ -191,7 +183,7 @@ namespace FCUAutoDesign
                 if (supplyMainPipe == null) return Result.Cancelled;
 
                 // 2. 根据用户勾选决定是否提示拾取回水主管
-                Pipe returnMainPipe = useAutomaticPipes ? returnDiscovery?.UniquePipe : null;
+                Pipe returnMainPipe = automaticZones == null ? null : automaticZones[0].Return;
                 if (options.EnableReturnPipe)
                 {
                     try
@@ -208,7 +200,7 @@ namespace FCUAutoDesign
                     }
                 }
 
-                Pipe condensateMainPipe = useAutomaticPipes ? drainDiscovery?.UniquePipe : null;
+                Pipe condensateMainPipe = automaticZones == null ? null : automaticZones[0].Condensate;
                 if (options.EnableCondensate)
                 {
                     if (condensateMainPipe == null)
@@ -217,8 +209,18 @@ namespace FCUAutoDesign
                 }
 
                 var batchClock = System.Diagnostics.Stopwatch.StartNew();
-                List<RoomExecutionResult> results = new FcuBatchService().Execute(doc, rooms,
-                    supplyMainPipe, returnMainPipe, condensateMainPipe, options);
+                List<RoomExecutionResult> results = new List<RoomExecutionResult>();
+                if (automaticZones == null)
+                {
+                    results.AddRange(new FcuBatchService().Execute(doc, rooms,
+                        supplyMainPipe, returnMainPipe, condensateMainPipe, options));
+                }
+                else
+                {
+                    foreach (AutomaticScopeZone zone in automaticZones)
+                        results.AddRange(new FcuBatchService().Execute(doc, zone.Rooms.ToList(),
+                            zone.Supply, zone.Return, zone.Condensate, options));
+                }
                 batchClock.Stop();
                 new BatchReportPresenter().Show(results, options, batchClock.Elapsed);
                 // 部分房间失败不能以命令级 Failed 撤销已提交的其他房间。

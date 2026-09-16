@@ -6,7 +6,6 @@ namespace FCUAutoDesign
     {
         public int SelectedFcuTypeId { get; set; }
         public double DoorOffsetMm { get; set; }
-        public bool CenterPlacement { get; set; }
         public double FcuElevationMm { get; set; }
         public double ValveClearanceMm { get; set; }
         public double? MinimumStraightLengthMm { get; set; }

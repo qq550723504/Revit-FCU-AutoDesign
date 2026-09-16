@@ -61,9 +61,8 @@ namespace FCUAutoDesign
                     }
                 }
 
-                XYZ targetPoint = options.CenterPlacement
-                    ? RoomRuleSnapshotReader.GetRoomCenter(doc, room, wallDirection)
-                    : RoomRuleSnapshotReader.GetDoorWallOffsetCenter(doc, room, doorWall, options.DoorOffsetMm);
+                XYZ targetPoint = RoomRuleSnapshotReader.GetDoorWallOffsetCenter(
+                    doc, room, doorWall, options.DoorOffsetMm);
                 if (targetPoint != null)
                 {
                     candidatePt = targetPoint;

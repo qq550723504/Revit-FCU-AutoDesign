@@ -1,8 +1,10 @@
 $ErrorActionPreference = 'Stop'
 $contractSource = Get-Content (Join-Path $PSScriptRoot '..\Models\DesignRecordContract.cs') -Raw -Encoding UTF8
 $plannerSource = Get-Content (Join-Path $PSScriptRoot '..\Business\DesignReconciliation\DesignReconciliation.cs') -Raw -Encoding UTF8
+$policySource = Get-Content (Join-Path $PSScriptRoot '..\Business\DesignReconciliation\ReconciliationApplyPolicy.cs') -Raw -Encoding UTF8
 $contractSource = $contractSource -replace '(?m)^using\s+[^;]+;\s*', ''
 $plannerSource = $plannerSource -replace '(?m)^using\s+[^;]+;\s*', ''
+$policySource = $policySource -replace '(?m)^using\s+[^;]+;\s*', ''
 $checks = @'
 namespace FCUAutoDesign.Business.DesignReconciliation
 {
@@ -66,6 +68,8 @@ namespace FCUAutoDesign.Business.DesignReconciliation
                 && update.Items[0].Action == ReconciliationAction.Update
                 && update.Items[0].ChangedFields.Contains("DesignCoolingLoad"),
                 "Algorithm-only load change creates an update");
+            Check(new ReconciliationApplyPolicy().Evaluate(update).CanApplyRecordOnly,
+                "Load-only update may advance the persisted calculation baseline");
 
             var moved = Device("d1", 5, 2);
             var preserveMove = Plan(Snapshot(DesignSnapshotKind.Baseline, 1, "fp-1", Device("d1", 5, 1)),
@@ -73,6 +77,8 @@ namespace FCUAutoDesign.Business.DesignReconciliation
                 Snapshot(DesignSnapshotKind.Desired, 2, "desired-3", loadChanged));
             Check(preserveMove.IsApplicable && preserveMove.Items[0].Action == ReconciliationAction::Update,
                 "Manual position change is preserved while load updates");
+            Check(!new ReconciliationApplyPolicy().Evaluate(preserveMove).CanApplyRecordOnly,
+                "Load update with a manual position change remains preview-only");
 
             var conflictDesired = Device("d1", 5, 3);
             var conflict = Plan(Snapshot(DesignSnapshotKind.Baseline, 1, "fp-1", Device("d1", 5, 1)),
@@ -93,6 +99,8 @@ namespace FCUAutoDesign.Business.DesignReconciliation
                 Snapshot(DesignSnapshotKind.Desired, 2, "desired-6"));
             Check(removed.IsApplicable && removed.Items[0].Action == ReconciliationAction.DeleteCandidate,
                 "Reduced desired set produces an explicit delete candidate");
+            Check(!new ReconciliationApplyPolicy().Evaluate(removed).CanApplyRecordOnly,
+                "Delete candidates cannot use record-only apply");
 
             var newDevice = Plan(Snapshot(DesignSnapshotKind.Baseline, 1, "fp-1"),
                 Snapshot(DesignSnapshotKind.Current, 1, "fp-1"),
@@ -135,5 +143,5 @@ namespace FCUAutoDesign.Business.DesignReconciliation
 '@
 $checks = $checks.Replace('ReconciliationAction::Update', 'ReconciliationAction.Update')
 $imports = "using System;`r`nusing System.Collections.Generic;`r`nusing System.Linq;`r`n"
-Add-Type -TypeDefinition ($imports + $contractSource + [Environment]::NewLine + $plannerSource + [Environment]::NewLine + $checks)
+Add-Type -TypeDefinition ($imports + $contractSource + [Environment]::NewLine + $plannerSource + [Environment]::NewLine + $policySource + [Environment]::NewLine + $checks)
 [FCUAutoDesign.Business.DesignReconciliation.DesignReconciliationChecks]::Run()

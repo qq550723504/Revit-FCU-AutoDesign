@@ -12,15 +12,18 @@ namespace FCUAutoDesign
         {
             if (snapshot == null) throw new ArgumentNullException("snapshot");
             IEnumerable<string> roomParts = snapshot.Rooms.OrderBy(x => x.RoomUniqueId, StringComparer.Ordinal)
-                .Select(x => string.Join("|", x.RoomUniqueId, Number(x.Length), Number(x.Height),
+                .Select(x => string.Join("|", x.RoomUniqueId, x.RoomNumber, x.RoomName, x.LevelUniqueId,
+                    Number(x.Length), Number(x.Height),
                     Number(x.CoolingLoadDensity), Number(x.DesignCoolingLoad), x.UnitCount,
-                    Join(x.DeviceLogicalIds), Join(x.PipeLogicalIds)));
+                    x.IsDetached, Join(x.DeviceLogicalIds), Join(x.PipeLogicalIds)));
             IEnumerable<string> deviceParts = snapshot.Devices.OrderBy(x => x.LogicalDeviceId, StringComparer.Ordinal)
-                .Select(x => string.Join("|", x.LogicalDeviceId, x.ElementUniqueId, x.FamilySymbolUniqueId,
+                .Select(x => string.Join("|", x.LogicalDeviceId, x.ElementUniqueId, x.RoomUniqueId, x.CatalogItemId,
+                    x.FamilySymbolUniqueId, Number(x.DesignCoolingLoad), Number(x.RatedCoolingCapacity),
                     Point(x.Position), x.Orientation, (int)x.State));
             IEnumerable<string> pipeParts = snapshot.Pipes.OrderBy(x => x.LogicalPipeId, StringComparer.Ordinal)
                 .Select(x => string.Join("|", x.LogicalPipeId, x.ElementUniqueId, (int)x.Role,
-                    (int)x.Ownership, x.SharedNetworkId, Number(x.CurrentDiameter), Number(x.PlannedDiameter),
+                    (int)x.Ownership, x.SharedNetworkId, x.ParentLogicalPipeId,
+                    Number(x.CurrentDiameter), Number(x.PlannedDiameter),
                     (int)x.State, Join(x.ServiceRoomUniqueIds), Join(x.ConnectedElementUniqueIds)));
             string canonical = string.Join("\n", roomParts.Concat(deviceParts).Concat(pipeParts));
             using (SHA256 sha = SHA256.Create())

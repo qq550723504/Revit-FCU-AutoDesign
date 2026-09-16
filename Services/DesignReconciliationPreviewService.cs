@@ -11,12 +11,21 @@ using static FCUAutoDesign.RevitUnits;
 
 namespace FCUAutoDesign
 {
+    internal enum ReconciliationPreviewOutcome
+    {
+        NotHandled,
+        PreviewOnly,
+        Applied
+    }
+
     internal sealed class DesignReconciliationPreviewService
     {
         private readonly FcuPlacementService placement = new FcuPlacementService();
         private readonly FcuConnectorResolver connectors = new FcuConnectorResolver();
+        private readonly DesignReconciliationPlanner planner = new DesignReconciliationPlanner();
+        private readonly ReconciliationApplyPolicy applyPolicy = new ReconciliationApplyPolicy();
 
-        public bool ShowIfExisting(Document doc, IList<Room> rooms, FcuDesignOptions options)
+        public ReconciliationPreviewOutcome ShowIfExisting(Document doc, IList<Room> rooms, FcuDesignOptions options)
         {
             DesignRecordRepository repository = new DesignRecordRepository(doc);
             List<Tuple<Room, DesignRecord>> existing = new List<Tuple<Room, DesignRecord>>();
@@ -31,10 +40,11 @@ namespace FCUAutoDesign
                 else
                     throw new InvalidOperationException("读取房间设计记录失败：" + read.Message);
             }
-            if (existing.Count == 0) return false;
+            if (existing.Count == 0) return ReconciliationPreviewOutcome.NotHandled;
 
             StringBuilder summary = new StringBuilder();
             StringBuilder details = new StringBuilder();
+            List<ReconciliationSession> sessions = new List<ReconciliationSession>();
             int conflicts = 0, creates = 0, updates = 0, deletes = 0, manual = 0;
             foreach (Tuple<Room, DesignRecord> entry in existing)
             {
@@ -44,7 +54,7 @@ namespace FCUAutoDesign
                 if (baseline == null) throw new InvalidOperationException("设计记录缺少上次成功快照。");
                 DesignSnapshot current = BuildCurrent(doc, room, options, baseline);
                 DesignSnapshot desired = BuildDesired(doc, room, options, record, baseline);
-                ReconciliationPlan plan = new DesignReconciliationPlanner().BuildPlan(new ReconciliationRequest
+                ReconciliationPlan plan = planner.BuildPlan(new ReconciliationRequest
                 {
                     Baseline = baseline,
                     Current = current,
@@ -54,6 +64,16 @@ namespace FCUAutoDesign
                 });
                 if (plan.ErrorCode != DesignErrorCode.None)
                     throw new InvalidOperationException("重算预览失败：" + plan.ErrorMessage);
+                ReconciliationApplyDecision decision = applyPolicy.Evaluate(plan);
+                sessions.Add(new ReconciliationSession
+                {
+                    Room = room,
+                    Record = record,
+                    Current = current,
+                    Desired = desired,
+                    Plan = plan,
+                    ApplyDecision = decision
+                });
                 string label = (room.Number ?? room.Id.IntegerValue.ToString()) + " " + (room.Name ?? string.Empty);
                 summary.AppendLine(label + "：" + (plan.Items.Count == 0 ? "无变化" : plan.Items.Count + " 项差异"));
                 details.AppendLine(label + "（DesignId " + record.Identity.DesignId + "，Revision "
@@ -75,24 +95,134 @@ namespace FCUAutoDesign
                     }
                 }
                 details.AppendLine("  当前指纹：" + current.Fingerprint);
+                details.AppendLine("  写入判定：" + decision.Reason);
                 details.AppendLine();
             }
             foreach (Room room in newRooms)
                 details.AppendLine((room.Number ?? room.Id.IntegerValue.ToString()) + " " + room.Name
                     + "：没有设计记录；本次混合选择不执行新建。");
 
-            TaskDialog dialog = new TaskDialog("FCU-205 只读重算预览")
+            bool canApply = newRooms.Count == 0 && sessions.Count > 0
+                && sessions.All(x => x.ApplyDecision.CanApplyRecordOnly);
+            TaskDialog dialog = new TaskDialog(canApply ? "FCU-205 计算记录更新" : "FCU-205 只读重算预览")
             {
-                MainInstruction = "检测到已有 FCU 设计，本次仅显示差异",
+                MainInstruction = canApply
+                    ? "仅检测到冷指标或设计负荷变化，是否更新设计记录？"
+                    : "检测到已有 FCU 设计，本次仅显示差异",
                 MainContent = "新增 " + creates + "，更新 " + updates + "，删除候选 " + deletes
                     + "，人工修改保留 " + manual + "，冲突 " + conflicts + "。"
                     + Environment.NewLine + summary,
                 ExpandedContent = details.ToString(),
-                FooterText = "本次未选择主管、未修改模型、未更新 Revision；正式自动管径仍未启用。",
-                CommonButtons = TaskDialogCommonButtons.Close
+                FooterText = canApply
+                    ? "确认后仅更新冷指标、设计负荷和 Revision；不移动或替换设备，不修改管线和管径。"
+                    : "本次未选择主管、未修改模型、未更新 Revision；正式自动管径仍未启用。",
+                CommonButtons = canApply
+                    ? TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
+                    : TaskDialogCommonButtons.Close,
+                DefaultButton = canApply ? TaskDialogResult.No : TaskDialogResult.Close
             };
-            dialog.Show();
-            return true;
+            TaskDialogResult answer = dialog.Show();
+            if (!canApply || answer != TaskDialogResult.Yes)
+                return ReconciliationPreviewOutcome.PreviewOnly;
+
+            ApplyCalculationRecords(doc, repository, sessions, options);
+            TaskDialog.Show("FCU-205 更新完成", "已更新 " + sessions.Count
+                + " 个房间的计算记录。未移动或替换设备，未修改任何管线和管径。");
+            return ReconciliationPreviewOutcome.Applied;
+        }
+
+        private void ApplyCalculationRecords(Document doc, DesignRecordRepository repository,
+            IList<ReconciliationSession> sessions, FcuDesignOptions options)
+        {
+            // The dialog creates a time gap. Re-capture model state before writing so an
+            // element changed while the preview was open cannot be accepted as this baseline.
+            foreach (ReconciliationSession session in sessions)
+            {
+                DesignSnapshot fresh = BuildCurrent(doc, session.Room, options,
+                    session.Record.LastSuccessfulSnapshot);
+                if (!string.Equals(fresh.Fingerprint, session.Current.Fingerprint, StringComparison.Ordinal))
+                    throw new InvalidOperationException("房间 " + session.Room.Number
+                        + " 的模型在预览后已变化，请重新执行重算。");
+            }
+
+            using (TransactionGroup group = new TransactionGroup(doc, "FCU-205 更新计算设计记录"))
+            {
+                group.Start();
+                try
+                {
+                    using (Transaction transaction = new Transaction(doc, "更新 FCU 冷指标与设计负荷记录"))
+                    {
+                        transaction.Start();
+                        foreach (ReconciliationSession session in sessions)
+                        {
+                            DesignVersion expected = CopyVersion(session.Record.Version);
+                            DesignSnapshot baseline = session.Desired;
+                            baseline.Kind = DesignSnapshotKind.Baseline;
+                            baseline.Status = DesignSnapshotStatus.Valid;
+                            baseline.CapturedAtUtc = DateTime.UtcNow;
+                            baseline.Fingerprint = DesignSnapshotFingerprint.Compute(baseline);
+                            DesignRecord updated = new DesignRecord
+                            {
+                                Identity = new DesignIdentity
+                                {
+                                    DesignId = session.Record.Identity.DesignId,
+                                    HostDocumentId = session.Record.Identity.HostDocumentId
+                                },
+                                Version = CopyVersion(baseline.Version),
+                                Status = DesignRecordStatus.Committed,
+                                LastSuccessfulSnapshot = baseline,
+                                CurrentSnapshot = null,
+                                DesiredSnapshot = null
+                            };
+                            DesignOperationResult saved = repository.Save(new DesignWriteRequest
+                            {
+                                Record = updated,
+                                ExpectedVersion = expected
+                            });
+                            if (saved.Status != DesignOperationStatus.Succeeded)
+                                throw new InvalidOperationException("保存房间 " + session.Room.Number
+                                    + " 的设计记录失败：" + saved.Message);
+                            session.AppliedFingerprint = baseline.Fingerprint;
+                            session.AppliedRevision = baseline.Version.Revision;
+                        }
+                        if (transaction.Commit() != TransactionStatus.Committed)
+                            throw new InvalidOperationException("FCU 计算设计记录事务未能提交。");
+                    }
+
+                    foreach (ReconciliationSession session in sessions)
+                    {
+                        DesignRecordReadResult verified = repository.LoadByRoomUniqueId(session.Room.UniqueId);
+                        if (verified.Status != DesignOperationStatus.Succeeded
+                            || verified.Record == null
+                            || verified.Record.Version == null
+                            || verified.Record.LastSuccessfulSnapshot == null
+                            || verified.Record.Version.Revision != session.AppliedRevision
+                            || !string.Equals(verified.Record.LastSuccessfulSnapshot.Fingerprint,
+                                session.AppliedFingerprint, StringComparison.Ordinal))
+                            throw new InvalidOperationException("房间 " + session.Room.Number
+                                + " 的设计记录提交后校验失败。");
+                    }
+                    if (group.Assimilate() != TransactionStatus.Committed)
+                        throw new InvalidOperationException("FCU 计算设计记录事务组未能合并。");
+                }
+                catch
+                {
+                    if (group.GetStatus() == TransactionStatus.Started) group.RollBack();
+                    throw;
+                }
+            }
+        }
+
+        private sealed class ReconciliationSession
+        {
+            public Room Room { get; set; }
+            public DesignRecord Record { get; set; }
+            public DesignSnapshot Current { get; set; }
+            public DesignSnapshot Desired { get; set; }
+            public ReconciliationPlan Plan { get; set; }
+            public ReconciliationApplyDecision ApplyDecision { get; set; }
+            public int AppliedRevision { get; set; }
+            public string AppliedFingerprint { get; set; }
         }
 
         private DesignSnapshot BuildCurrent(Document doc, Room room, FcuDesignOptions options, DesignSnapshot baseline)

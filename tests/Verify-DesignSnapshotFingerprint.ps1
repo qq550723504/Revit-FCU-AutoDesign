@@ -23,7 +23,10 @@ public static class Checks
             DesignCoolingLoad = new DesignQuantity(6, DesignUnit.Kilowatt) };
         room.DeviceLogicalIds.Add("device"); room.PipeLogicalIds.Add("pipe"); snapshot.Rooms.Add(room);
         snapshot.Devices.Add(new DesignDeviceRecord { LogicalDeviceId = "device", ElementUniqueId = "element-device",
-            FamilySymbolUniqueId = "symbol", Position = new DesignPoint(x, .5, 2.6, DesignUnit.Meter, "origin"),
+            CatalogItemId = "FP-102", FamilySymbolUniqueId = "symbol",
+            DesignCoolingLoad = new DesignQuantity(6, DesignUnit.Kilowatt),
+            RatedCoolingCapacity = new DesignQuantity(7.2, DesignUnit.Kilowatt),
+            Position = new DesignPoint(x, .5, 2.6, DesignUnit.Meter, "origin"),
             Orientation = "1,0,0", State = DesignElementState.CreatedByPlugin });
         snapshot.Pipes.Add(new DesignPipeRecord { LogicalPipeId = "pipe", ElementUniqueId = pipeId,
             Role = DesignPipeRole.SupplyBranch, Ownership = DesignPipeOwnership.Room,
@@ -37,6 +40,9 @@ public static class Checks
         Check(first == repeated && first.Length == 64, "Same state has stable SHA-256 fingerprint");
         Check(first != DesignSnapshotFingerprint.Compute(Snapshot(2.0, "element-pipe")), "Manual position change invalidates fingerprint");
         Check(first != DesignSnapshotFingerprint.Compute(Snapshot(1.5, "replacement-pipe")), "Pipe replacement invalidates fingerprint");
+        var loadChanged = Snapshot(1.5, "element-pipe");
+        loadChanged.Devices[0].DesignCoolingLoad = new DesignQuantity(6.5, DesignUnit.Kilowatt);
+        Check(first != DesignSnapshotFingerprint.Compute(loadChanged), "Device calculation change invalidates fingerprint");
         Console.WriteLine(count + " snapshot fingerprint checks passed.");
     }
 }

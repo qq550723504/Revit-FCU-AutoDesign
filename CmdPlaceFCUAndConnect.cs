@@ -103,8 +103,13 @@ namespace FCUAutoDesign
                     }
                 }
 
-                // 已登记房间进入只读三方差异预览。本轮不继续选择主管或修改模型。
-                if (new DesignReconciliationPreviewService().ShowIfExisting(doc, rooms, options))
+                // 已登记房间先进入三方差异预览。只有纯计算字段变化可在明确确认后
+                // 更新设计记录；任何模型几何、型号、数量或管线变化仍保持只读。
+                ReconciliationPreviewOutcome reconciliation =
+                    new DesignReconciliationPreviewService().ShowIfExisting(doc, rooms, options);
+                if (reconciliation == ReconciliationPreviewOutcome.Applied)
+                    return Result.Succeeded;
+                if (reconciliation == ReconciliationPreviewOutcome.PreviewOnly)
                     return Result.Cancelled;
 
                 if (options.EnableBusinessRulePreview)

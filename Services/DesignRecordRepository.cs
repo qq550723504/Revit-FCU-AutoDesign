@@ -14,7 +14,9 @@ namespace FCUAutoDesign
     internal sealed class DesignRecordRepository : IDesignRecordRepository
     {
         internal static readonly Guid SchemaGuid = new Guid("2b9c8d2a-1b4c-4de9-9a2a-5c3a3dbdb2d1");
-        private const string SchemaName = "FCUAutoDesign.DesignRecord.v1";
+        // Revit 2020 Extensible Storage accepts letters, digits and underscore;
+        // dots are rejected by SchemaBuilder.SetSchemaName.
+        private const string SchemaName = "FCUAutoDesign_DesignRecord_v1";
         private const string DesignIdField = "DesignId";
         private const string HostDocumentIdField = "HostDocumentId";
         private const string SchemaVersionField = "SchemaVersion";

@@ -254,22 +254,7 @@ namespace FCUAutoDesign
 
         private static CondensateDrainResult Wrap(Document doc, TeeConnectionResult source)
         {
-            CondensateDrainResult result = new CondensateDrainResult
-            {
-                Connected = source.BranchCreated && source.TeeCreated,
-                ErrorMessage = source.ErrorMessage
-            };
-            result.Connection.BranchCreated = source.BranchCreated;
-            result.Connection.TeeCreated = source.TeeCreated;
-            result.Connection.ErrorMessage = source.ErrorMessage;
-            result.Connection.FcuConnectorId = source.FcuConnectorId;
-            result.Connection.MainPart1Id = source.MainPart1Id;
-            result.Connection.MainPart2Id = source.MainPart2Id;
-            result.Connection.MainPart1AdapterId = source.MainPart1AdapterId;
-            result.Connection.MainPart2AdapterId = source.MainPart2AdapterId;
-            foreach (KeyValuePair<int, string> role in source.ElementRoles)
-                result.Connection.ElementRoles[role.Key] = role.Value;
-            result.Connection.Chain.AddRange(source.Chain);
+            CondensateDrainResult result = new CondensateDrainResult(source);
             foreach (ElementId id in source.Chain)
                 if (doc.GetElement(id) is Pipe)
                     result.PipeIds.Add(id);

@@ -4,6 +4,16 @@
 
 ## 2026-09-16 直达路线、首段安装净长与墙体检查
 
+### 后续回归修复：冷凝水结果传递丢失首段管 ID
+
+用户 0a6cd0e 截图：首房间 1.98 秒后失败并回滚，后两房间未执行，Revit 报 `Document.GetElement` 参数 `id` 为空。对应 `route-20260916-022227-750bb3e347b14cda999b0edc11e49499.txt` 记录冷凝水第 3 次试建 252 mm 首段、150 mm 下翻在 489 ms 通过候选检查。候选通过不代表主事务/事务组验收成功；本次整体为 FAIL。
+
+代码根因：`CondensateSeparationService.Wrap` 逐字段复制连接记录，漏掉新增的 `FirstPipeId` 和 `MinimumStraightLength`。提交后 `ConnectionInstallationVerifier` 读取空首段 ID 导致回滚。改为结果构造时直接保留完整的已验证连接记录；缺失首段 ID 仍明确失败，不能跳过校验。
+
+PASS：Revit 2020/.NET 4.8 Release Rebuild Exit 0。运行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Verify-ConnectionResult.ps1`，真实输出 `11 connection result checks passed. Revit geometry/commit/rollback: NOT_RUN.` 测试编译生产结果模型，使用惰性的 Revit ID/XYZ 替身验证记录传递、净长、主管/过渡件及失败状态；不是 Revit 运行时测试。测试编译器使用 Visual Studio Roslyn，与项目 C# 语法兼容。
+
+NOT_RUN：修复后的实际主事务提交、提交后复核、多房间连续接管及模型回滚；需干净模型副本复测。
+
 ### 后续回归修复：最小净长留空不能隐含锁死目标距离
 
 现场截图及 `route-20260916-021334-75086c487707466cac13305d489a12f4.txt` 显示：整房间 1.18 秒，供回水已连接，冷凝水预筛 264、跳过 264、试建 0。全部首段撞同一供水下翻管；`earlyLeads(mm)` 为空。根因是 aae8618 在最小净长留空时禁用了提前转弯，错误地把 400 mm 目标距离当作硬下限。该版本此用例为 FAIL。

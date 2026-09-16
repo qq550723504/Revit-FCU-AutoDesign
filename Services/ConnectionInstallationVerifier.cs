@@ -13,6 +13,8 @@ namespace FCUAutoDesign
         public static void Verify(Document doc, TeeConnectionResult result)
         {
             if (result == null || !result.BranchCreated) return;
+            if (result.FirstPipeId == null || result.FirstPipeId == ElementId.InvalidElementId)
+                throw new InvalidOperationException("连接结果缺少首段管 ID，无法复核安装净长；本次操作不予提交。");
             Pipe first = doc.GetElement(result.FirstPipeId) as Pipe;
             Line firstLine = (first?.Location as LocationCurve)?.Curve as Line;
             if (firstLine == null) throw new InvalidOperationException("FCU 首段直管已丢失。");

@@ -40,6 +40,10 @@ namespace FCUAutoDesign
 
             // 执行结果诊断追踪器（用于杜绝假成功并诚实汇报）
             ExecutionOutcome outcome = new ExecutionOutcome { CondensateEnabled = options.EnableCondensate };
+            outcome.Warnings.Add(options.MinimumStraightLengthMm.HasValue
+                ? $"三路首段净直管最小值 {options.MinimumStraightLengthMm.Value:F1} mm，按用户输入校验；不代表阀组/保温/检修空间已验收。"
+                : "未指定工程最小净直管长度；禁止缩短目标首段，但未校验安装净长要求。400 mm 默认值不是规范值。");
+            outcome.Warnings.Add("仅检查宿主墙的水平正交穿越和墙内管件；未创建洞口或套管，未检查链接模型、保温及施工净距。");
             CondensateDrainResult drainResult = null;
             TeeConnectionResult supplyResult = null;
             TeeConnectionResult returnResult = null;
@@ -85,7 +89,8 @@ namespace FCUAutoDesign
                             branchDiameterFeet,
                             options.FlipDropMm * MM_TO_FEET,
                             options.ValveClearanceMm * MM_TO_FEET,
-                            options.BreakCurveAndTee, failureReporter, null, batch?.Supply, batch, "供水"
+                            options.BreakCurveAndTee, failureReporter, null, batch?.Supply, batch, "供水",
+                            options.MinimumStraightLengthMm * MM_TO_FEET
                         );
                         outcome.SupplyBranchCreated = supplyRes.BranchCreated;
                         outcome.SupplyTeeConnected = supplyRes.TeeCreated;
@@ -108,7 +113,8 @@ namespace FCUAutoDesign
                             branchDiameterFeet,
                             options.FlipDropMm * MM_TO_FEET,
                             options.ValveClearanceMm * MM_TO_FEET,
-                            options.BreakCurveAndTee, failureReporter, supplyResult, batch?.Return, batch
+                            options.BreakCurveAndTee, failureReporter, supplyResult, batch?.Return, batch,
+                            minimumStraightLength: options.MinimumStraightLengthMm * MM_TO_FEET
                         );
                         outcome.ReturnBranchCreated = returnRes.BranchCreated;
                         outcome.ReturnTeeConnected = returnRes.TeeCreated;
@@ -129,7 +135,7 @@ namespace FCUAutoDesign
                             20 * MM_TO_FEET,
                             failureReporter, supplyResult, returnResult, batch?.Condensate, batch,
                             options.ValveClearanceMm * MM_TO_FEET,
-                            options.FlipDropMm * MM_TO_FEET);
+                            options.FlipDropMm * MM_TO_FEET, options.MinimumStraightLengthMm * MM_TO_FEET);
                         outcome.CondensateConnected = drainResult.Connected;
                         if (!string.IsNullOrEmpty(drainResult.ErrorMessage))
                             outcome.Warnings.Add("冷凝水管: " + drainResult.ErrorMessage);
@@ -160,6 +166,9 @@ namespace FCUAutoDesign
                     throw new InvalidOperationException("提交后位置或连接链复核失败，已回滚整次 PoC 操作。");
                 condensate.Verify(doc, drainResult, supplyResult, returnResult);
                 separation.Verify(doc, supplyResult, returnResult);
+                ConnectionInstallationVerifier.Verify(doc, supplyResult);
+                ConnectionInstallationVerifier.Verify(doc, returnResult);
+                ConnectionInstallationVerifier.Verify(doc, drainResult?.Connected == true ? drainResult.Connection : null);
                 batch?.VerifyPrevious(doc, supplyResult, returnResult, drainResult?.Connected == true ? drainResult.Connection : null);
                 if (group.Assimilate() != TransactionStatus.Committed)
                     throw new InvalidOperationException("PoC 事务组未成功提交。");

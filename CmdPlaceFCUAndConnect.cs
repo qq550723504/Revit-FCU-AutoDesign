@@ -56,6 +56,7 @@ namespace FCUAutoDesign
                     DoorOffsetMm = uiWindow.DoorOffsetMm,
                     FcuElevationMm = uiWindow.FcuElevationMm,
                     ValveClearanceMm = uiWindow.ValveClearanceMm,
+                    MinimumStraightLengthMm = uiWindow.MinimumStraightLengthMm,
                     FlipDropMm = uiWindow.FlipDropMm,
                     CoolingIndexWPerSquareMeter = uiWindow.CoolingIndexWPerSquareMeter,
                     EnableAutoSizing = uiWindow.EnableAutoSizing,

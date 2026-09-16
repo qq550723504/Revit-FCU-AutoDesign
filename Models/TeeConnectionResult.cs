@@ -9,6 +9,8 @@ namespace FCUAutoDesign
         public bool TeeCreated { get; set; }
         public string ErrorMessage { get; set; }
         public int FcuConnectorId { get; set; }
+        public ElementId FirstPipeId { get; set; }
+        public double? MinimumStraightLength { get; set; }
         public List<ElementId> Chain { get; } = new List<ElementId>();
         public ElementId MainPart1Id { get; set; }
         public ElementId MainPart2Id { get; set; }

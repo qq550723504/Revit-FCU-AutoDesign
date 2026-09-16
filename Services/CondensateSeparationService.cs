@@ -20,7 +20,7 @@ namespace FCUAutoDesign
             ElementId levelId, double diameter, RollBackOnErrorPreprocessor reporter,
             TeeConnectionResult supply, TeeConnectionResult ret, MainPipeRun run = null,
             RoomBatchContext batch = null, double leadLength = 500 * MM_TO_FEET,
-            double drop = 150 * MM_TO_FEET)
+            double drop = 150 * MM_TO_FEET, double? minimumStraightLength = null)
         {
             if (connector == null) throw new InvalidOperationException("FCU 没有可用的冷凝水管道接口。");
             if (main == null) throw new InvalidOperationException("未选择冷凝水主管。");
@@ -54,23 +54,27 @@ namespace FCUAutoDesign
                         +" direction="+port.CoordinateSystem.BasisZ+" connected="+port.IsConnected);
             var obstacles = ReadPipeObstacles(doc, supply, ret, trace).ToList();
             double minLength = Math.Max(doc.Application.ShortCurveTolerance, MM_TO_FEET);
-            double[] earlyLeads = OutletLeadPlanner.BeforeObstacles(
+            double[] earlyLeads = minimumStraightLength.HasValue ? OutletLeadPlanner.BeforeObstacles(
                 new Point3D(origin.X, origin.Y, origin.Z), new Vector3D(direction.X, direction.Y, direction.Z),
                 ReadObstacleCorners(doc, supply, ret, trace), leadLength,
-                Math.Max(diameter / 2, connector.Radius), step, minLength);
+                Math.Max(diameter / 2, connector.Radius), step, minLength)
+                .Where(x => x > minimumStraightLength.Value).ToArray() : new double[0];
             trace.Add("earlyLeads(mm)="+string.Join(",",earlyLeads.Select(x=>(x*FEET_TO_MM).ToString("F3",System.Globalization.CultureInfo.InvariantCulture))));
-            // 先尝试在已有供回水前转弯；保留原候选，因为包围盒可能保守地高估障碍。
-            double[] leads = earlyLeads.Concat(Enumerable.Range(0, MaxCandidateStep + 1)
+            // 优先目标长度；指定净长下限后允许提前转弯，实际安装后再复核净长。
+            double[] leads = new[] { leadLength }.Concat(earlyLeads).Concat(Enumerable.Range(1, MaxCandidateStep)
                 .Select(i => leadLength + i * step)).ToArray();
 
+            foreach (bool direct in new[] { true, false })
             foreach (int lateralStep in lateralSteps)
             {
+                // 无下翻最多试三个长度，为下翻避让保留试建预算。
+                if (direct && lateralStep != 0) continue;
                 int maxDropStep = lateralStep == 0 ? MaxCandidateStep : 4;
-                foreach (double candidateLead in leads)
+                foreach (double candidateLead in direct ? leads.Take(3) : leads)
                 {
-                    for (int dropStep = 0; dropStep <= maxDropStep; dropStep++)
+                    for (int dropStep = 0; dropStep <= (direct ? 0 : maxDropStep); dropStep++)
                     {
-                        double candidateDrop = drop + dropStep * step;
+                        double candidateDrop = direct ? 0 : drop + dropStep * step;
                         double candidateLateral = lateralStep * step;
                         if (attempts >= MaxModelAttempts || trace.Clock.Elapsed.TotalSeconds >= 10)
                         {
@@ -113,7 +117,7 @@ namespace FCUAutoDesign
                                 TeeConnectionResult connectionResult = connection.ConnectWithLowerFlipAndTee(
                                     doc, current, currentMain, diameter, candidateDrop, candidateLead, true,
                                     "冷凝水", reporter, run, MEPSystemClassification.Sanitary,
-                                    candidateLateral);
+                                    candidateLateral, minimumStraightLength);
                                 trace.Add("BUILD returned");
                                 if (!connectionResult.BranchCreated || !connectionResult.TeeCreated)
                                     throw new InvalidOperationException(connectionResult.ErrorMessage ?? "冷凝水连接未完成。");
@@ -121,15 +125,15 @@ namespace FCUAutoDesign
                                 doc.Regenerate();
                                 Verify(doc, connectionResult, supply, ret);
                                 batch?.VerifyNew(doc, connectionResult);
+                                ConnectionInstallationVerifier.Verify(doc, connectionResult);
                                 trace.Add("VERIFY passed");
                                 if (candidate.Commit() != TransactionStatus.Committed)
                                     throw new InvalidOperationException("冷凝水避让候选未成功提交。");
 
                                 CondensateDrainResult result = Wrap(doc, connectionResult);
-                                if (candidateLead != leadLength || dropStep != 0 || lateralStep != 0)
-                                    result.ErrorMessage = $"冷凝水采用避让路径，预留段 {candidateLead * FEET_TO_MM:F0} mm，"
+                                result.ErrorMessage = $"冷凝水接管目标距离 {candidateLead * FEET_TO_MM:F0} mm，"
                                         + $"下翻高度 {candidateDrop * FEET_TO_MM:F0} mm，设备侧横移 {candidateLateral * FEET_TO_MM:F0} mm。"
-                                        + (candidateLead < leadLength ? "根据已有供回水位置提前转弯，冷凝水首段短于供回水预留参数。" : "");
+                                        + (candidateLead < leadLength ? "首段已缩短，并已校验指定的最小净直管长度。" : "");
                                 result.ErrorMessage = trace.Finish(result.ErrorMessage+Environment.NewLine
                                     +$"冷凝水诊断：预筛 {screened}，跳过 {skipped}，试建 {attempts}，耗时 {trace.Clock.Elapsed.TotalSeconds:F1} 秒；候选连接检查通过。");
                                 return result;

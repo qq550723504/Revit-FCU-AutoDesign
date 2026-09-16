@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName WindowsBase, PresentationCore
 $source = Get-Content (Join-Path $PSScriptRoot '..\Geometry\LowerFlipRoutePlanner.cs') -Raw -Encoding UTF8
 $locator = Get-Content (Join-Path $PSScriptRoot '..\Geometry\MainPipeSegmentLocator.cs') -Raw -Encoding UTF8
+$clearance = Get-Content (Join-Path $PSScriptRoot '..\Geometry\InstallationClearance.cs') -Raw -Encoding UTF8
 $checks = @'
 namespace FCUAutoDesign
 {
@@ -106,8 +107,18 @@ namespace FCUAutoDesign
             Reject(()=>MainPipeSegmentLocator.Locate(aParts,bParts,gap[gap.Length-1],.001), "Shifted approach in tee gap rejected");
             var beyond = LowerFlipRoutePlanner.Approach(P(0,9.7,3),dir,.4,.15,.6,.001);
             Reject(()=>MainPipeSegmentLocator.Locate(aParts,bParts,beyond[beyond.Length-1],.001), "Shifted approach outside main rejected");
-            Reject(()=>LowerFlipRoutePlanner.Complete(basis,P(.4,0,2),.001), "Zero approach segment rejected");
-            Reject(()=>LowerFlipRoutePlanner.Complete(basis,P(.4,4,2.85),.001), "Zero final riser rejected");
+            Check(LowerFlipRoutePlanner.Complete(basis,P(.4,0,2),.001).Length == 3, "Aligned drops merged without a zero segment");
+            Check(LowerFlipRoutePlanner.Complete(basis,P(.4,4,2.85),.001).Length == 4, "Same elevation omits unnecessary final riser");
+            var direct = LowerFlipRoutePlanner.Approach(start,dir,.4,0,0,.001);
+            var flat = LowerFlipRoutePlanner.Complete(direct,P(.4,4,3),.001);
+            Check(flat.Length == 3 && RightAngles(flat), "Same elevation uses one elbow without a low point");
+            var down = LowerFlipRoutePlanner.Complete(direct,P(.4,4,2),.001);
+            Check(down.Length == 4 && down[2] == P(.4,4,3) && RightAngles(down), "Drop is after horizontal wall crossing");
+            var up = LowerFlipRoutePlanner.Complete(direct,P(.4,4,4),.001);
+            Check(up.Length == 4 && up[2] == P(.4,4,3) && RightAngles(up), "Rise is after horizontal wall crossing");
+            Check(LowerFlipRoutePlanner.Complete(direct,P(4,0,3),.001).Length == 2, "Aligned run is a single straight pipe");
+            Reject(()=>LowerFlipRoutePlanner.Complete(direct,P(.2,0,3),.001), "Direct reversal remains rejected");
+            Reject(()=>LowerFlipRoutePlanner.Complete(direct,P(.4,.0001,3),.001), "Short nonzero section is not swallowed");
             Check(RightAngles(LowerFlipRoutePlanner.Complete(basis,P(.4,4,4),.001)), "Higher main preserves existing geometric behavior");
             Check(LowerFlipRoutePlanner.Approach(start,V(2,0,0),.4,.15,0,.001)[1] == P(.4,0,3), "Outward direction normalized");
             Reject(()=>LowerFlipRoutePlanner.Approach(start,dir,.4,.15,double.NaN,.001), "NaN offset rejected");
@@ -115,6 +126,15 @@ namespace FCUAutoDesign
             Reject(()=>LowerFlipRoutePlanner.Approach(start,dir,.4,-.15,0,.001), "Negative drop rejected");
             Reject(()=>LowerFlipRoutePlanner.Approach(start,V(0,0,1),.4,.15,0,.001), "Vertical connector rejected");
             Reject(()=>LowerFlipRoutePlanner.Approach(P(double.NaN,0,3),dir,.4,.15,0,.001), "Invalid coordinates rejected");
+            Check(InstallationClearance.MeetsMinimum(.21,.2), "Installed straight above minimum accepted");
+            Check(InstallationClearance.MeetsMinimum(.2,.2), "Installed straight at minimum accepted");
+            Check(!InstallationClearance.MeetsMinimum(.19,.2), "Fitting takeout reducing net straight below minimum rejected");
+            Check(InstallationClearance.MeetsMinimum(.1,null), "Unknown minimum does not invent a standard");
+            Check(!InstallationClearance.MeetsMinimum(double.NaN,null), "Invalid installed length rejected even with unknown minimum");
+            Reject(()=>InstallationClearance.ValidateMinimum(double.NaN), "NaN minimum rejected");
+            Reject(()=>InstallationClearance.ValidateMinimum(double.PositiveInfinity), "Infinite minimum rejected");
+            Reject(()=>InstallationClearance.ValidateMinimum(0), "Zero minimum is not an unknown value");
+            Reject(()=>InstallationClearance.ValidateMinimum(-1), "Negative minimum rejected");
             System.Console.WriteLine(count + " checks passed; " + routes + " active route candidates validated. Revit fitting, collision and rollback acceptance: NOT_RUN.");
         }
     }
@@ -122,5 +142,6 @@ namespace FCUAutoDesign
 '@
 # The planner already imports the namespaces used by the locator.
 $locator = [regex]::Replace($locator, '(?m)^using .*;\r?$', '')
-Add-Type -TypeDefinition ($source + [Environment]::NewLine + $locator + [Environment]::NewLine + $checks) -ReferencedAssemblies 'WindowsBase', 'PresentationCore'
+$clearance = [regex]::Replace($clearance, '(?m)^using .*;\r?$', '')
+Add-Type -TypeDefinition ($source + [Environment]::NewLine + $locator + [Environment]::NewLine + $clearance + [Environment]::NewLine + $checks) -ReferencedAssemblies 'WindowsBase', 'PresentationCore'
 [FCUAutoDesign.LowerFlipChecks]::Run()

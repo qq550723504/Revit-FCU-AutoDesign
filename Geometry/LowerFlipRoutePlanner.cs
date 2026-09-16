@@ -14,7 +14,7 @@ namespace FCUAutoDesign
                 || outward.Length < 1e-9 || Math.Abs(outward.Z) > 1e-6)
                 throw new InvalidOperationException("接口必须具有有效的水平出管方向。");
             if (!Finite(minLength) || minLength <= 0 || !Finite(lead) || lead <= minLength
-                || !Finite(drop) || drop <= minLength || !Finite(lateral)
+                || !Finite(drop) || drop < 0 || (drop != 0 && drop <= minLength) || !Finite(lateral)
                 || (lateral != 0 && Math.Abs(lateral) <= minLength))
                 throw new InvalidOperationException("路径长度无效或过短。");
 
@@ -28,19 +28,33 @@ namespace FCUAutoDesign
                 leadEnd += new Vector3D(-outward.Y, outward.X, 0) * lateral;
                 points.Add(leadEnd);
             }
-            points.Add(leadEnd - new Vector3D(0, 0, drop));
+            if (drop != 0) points.Add(leadEnd - new Vector3D(0, 0, drop));
             return points.ToArray();
         }
 
         public static Point3D[] Complete(Point3D[] approach, Point3D mainJoin, double minLength)
         {
-            if (approach == null || approach.Length < 3 || !Valid(mainJoin))
+            if (approach == null || approach.Length < 2 || !Valid(mainJoin))
                 throw new InvalidOperationException("接管路径或主管接入点无效。");
             var points = new List<Point3D>(approach);
-            points.Add(new Point3D(mainJoin.X, mainJoin.Y, approach[approach.Length - 1].Z));
-            points.Add(mainJoin);
+            AddDistinct(points, new Point3D(mainJoin.X, mainJoin.Y, approach[approach.Length - 1].Z));
+            AddDistinct(points, mainJoin);
+            // 合并同向共线段；反向折返仍交给 Validate 拒绝。
+            for (int i = 1; i < points.Count - 1;)
+            {
+                Vector3D a = points[i] - points[i - 1], b = points[i + 1] - points[i];
+                a.Normalize(); b.Normalize();
+                if (Vector3D.DotProduct(a, b) > 1 - 1e-10) points.RemoveAt(i);
+                else i++;
+            }
             Validate(points.ToArray(), minLength);
             return points.ToArray();
+        }
+
+        private static void AddDistinct(List<Point3D> points, Point3D next)
+        {
+            // 只消除重复点，不吞掉需要报错的短管。
+            if ((points[points.Count - 1] - next).Length > 1e-9) points.Add(next);
         }
 
         public static void Validate(Point3D[] points, double minLength)

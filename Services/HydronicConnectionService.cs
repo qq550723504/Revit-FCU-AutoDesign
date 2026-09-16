@@ -24,8 +24,9 @@ namespace FCUAutoDesign
             string circuit,
             RollBackOnErrorPreprocessor failureReporter, MainPipeRun run = null,
             MEPSystemClassification? expectedClassificationOverride = null,
-            double lateralOffset = 0)
+            double lateralOffset = 0, double? minimumStraightLength = null)
         {
+            InstallationClearance.ValidateMinimum(minimumStraightLength);
             if (fcuConn == null || fcuConn.IsConnected)
                 throw new InvalidOperationException("FCU 水管接口必须存在且未被占用。");
             XYZ startPt = fcuConn.Origin;
@@ -65,7 +66,6 @@ namespace FCUAutoDesign
             if (!(mainCurve is Line) || !mainCurve.IsBound
                 || Math.Abs(mainCurve.GetEndPoint(0).Z - mainCurve.GetEndPoint(1).Z) > MM_TO_FEET)
                 throw new InvalidOperationException("当前 PoC 只支持水平直线主管。");
-            bool hasLateralOffset = lateralOffset != 0;
             IntersectionResult projectRes = mainCurve.Project(new XYZ(approachEnd.X, approachEnd.Y, approachEnd.Z));
             if (projectRes == null)
             {
@@ -98,6 +98,7 @@ namespace FCUAutoDesign
             }
             List<XYZ> points = LowerFlipRoutePlanner.Complete(approach, Point(pMainBreak), minLength)
                 .Select(p => new XYZ(p.X, p.Y, p.Z)).ToList();
+            ConnectionInstallationVerifier.VerifyPlanned(doc, points);
 
             ElementId levelId = (mainPipe.ReferenceLevel != null) ? mainPipe.ReferenceLevel.Id : ElementId.InvalidElementId;
 
@@ -116,9 +117,9 @@ namespace FCUAutoDesign
 
             int[] startIds = new int[segments.Count];
             int[] endIds = new int[segments.Count];
-            string[] roles = hasLateralOffset
-                ? new[] { "设备水平预留段", "设备侧横移段", "下翻段", "横向接近主管段", "竖直接入主管段" }
-                : new[] { "设备水平预留段", "下翻段", "横向接近主管段", "竖直接入主管段" };
+            string[] roles = Enumerable.Range(0, segments.Count).Select(i => i == 0
+                ? "设备接管直段" : Math.Abs(points[i + 1].Z - points[i].Z) < minLength
+                    ? "水平接近/穿墙段" : points[i + 1].Z > points[i].Z ? "上翻段" : "下翻段").ToArray();
             for (int i = 0; i < segments.Count; i++)
             {
                 // 在任何管件改变管长之前锁定端头身份，后续不能重新按最近距离选端头。
@@ -141,6 +142,9 @@ namespace FCUAutoDesign
                             $"{stage}后，{role}被压缩至过短或反向。元素 ID: {segments[i].Id.IntegerValue}；"
                             + $"原规划长度 {planned.GetLength() * FEET_TO_MM:F1} mm，沿原方向剩余 {remaining * FEET_TO_MM:F1} mm。"
                             + "当前路径不能容纳所用管件，请调整路径尺寸或管件配置；本次连接不予提交。");
+                    if (i == 0 && !InstallationClearance.MeetsMinimum(remaining, minimumStraightLength))
+                        throw new InvalidOperationException($"{stage}后 FCU 净直管 {remaining * FEET_TO_MM:F1} mm 小于指定最小值"
+                            + $" {minimumStraightLength.Value * FEET_TO_MM:F1} mm。");
                 }
             };
 
@@ -174,6 +178,8 @@ namespace FCUAutoDesign
             }
             validateGeometry("FCU 接口连接");
             result.BranchCreated = true;
+            result.FirstPipeId = segments[0].Id;
+            result.MinimumStraightLength = minimumStraightLength;
             result.FcuConnectorId = fcuConn.Id;
             result.Chain.Add(fcuConn.Owner.Id);
             for (int i = 0; i < segments.Count; i++)

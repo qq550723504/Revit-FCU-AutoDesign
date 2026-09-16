@@ -15,17 +15,23 @@ namespace FCUAutoDesign
         public TeeConnectionResult ConnectReturn(Document doc, Connector connector, Pipe main,
             double diameter, double drop, double lead, bool enableTee,
             RollBackOnErrorPreprocessor reporter, TeeConnectionResult supply,
-            MainPipeRun run = null, RoomBatchContext batch = null, string circuit = "回水")
+            MainPipeRun run = null, RoomBatchContext batch = null, string circuit = "回水",
+            double? minimumStraightLength = null)
         {
             string lastReason = "没有可用路线";
             ElementId mainId = main.Id;
             ElementId ownerId = connector.Owner.Id;
             int connectorId = connector.Id;
             double step = Math.Max(100 * MM_TO_FEET, diameter * 4);
+            int attempts = 0;
+            // 先穷举有限的无下翻候选，再尝试有高差的避让，避免默认制造低点。
+            foreach (bool direct in new[] { true, false })
             for (int leadStep = 0; leadStep <= 4; leadStep++)
             {
-                for (int dropStep = 0; dropStep <= 4; dropStep++)
+                for (int dropStep = 0; dropStep <= (direct ? 0 : 4); dropStep++)
                 {
+                    double candidateDrop = direct ? 0 : drop + dropStep * step;
+                    attempts++;
                     HashSet<int> originalRoles = new HashSet<int>(reporter.ElementRoles.Keys);
                     using (SubTransaction candidate = new SubTransaction(doc))
                     {
@@ -34,18 +40,19 @@ namespace FCUAutoDesign
                         try
                         {
                             TeeConnectionResult result = hydronic.ConnectWithLowerFlipAndTee(doc,
-                                connector, main, diameter, drop + dropStep * step,
-                                lead + leadStep * step, enableTee, circuit, reporter, run);
+                                connector, main, diameter, candidateDrop,
+                                lead + leadStep * step, enableTee, circuit, reporter, run,
+                                minimumStraightLength: minimumStraightLength);
                             if (!result.BranchCreated || (enableTee && !result.TeeCreated))
                                 throw new InvalidOperationException(result.ErrorMessage ?? "回水连接未完成。");
                             doc.Regenerate();
                             Verify(doc, supply, result);
                             batch?.VerifyNew(doc, result);
+                            ConnectionInstallationVerifier.Verify(doc, result);
                             if (candidate.Commit() != TransactionStatus.Committed)
                                 throw new InvalidOperationException("回水避让候选未成功提交。");
-                            if (leadStep != 0 || dropStep != 0)
-                                result.ErrorMessage = $"为完成避让接入，{circuit}预留段采用 {(lead + leadStep * step) * FEET_TO_MM:F0} mm，"
-                                    + $"下翻高度采用 {(drop + dropStep * step) * FEET_TO_MM:F0} mm。"
+                            result.ErrorMessage = $"{circuit}接管目标距离采用 {(lead + leadStep * step) * FEET_TO_MM:F0} mm，"
+                                    + $"设备侧下翻高度 {candidateDrop * FEET_TO_MM:F0} mm。"
                                     + (enableTee ? "" : "未启用主管三通接入。");
                             return result;
                         }
@@ -70,7 +77,7 @@ namespace FCUAutoDesign
                         .Single(c => c.Id == connectorId);
                 }
             }
-            throw new InvalidOperationException($"在限定的 25 条{circuit}候选路线内未找到可接入且不与已生成管线相交的方案。"
+            throw new InvalidOperationException($"在限定的 {attempts} 条{circuit}候选路线内未找到可接入且不与已生成管线相交的方案。"
                 + "已取消本次操作，请调整设备位置、主管或路径参数。最后原因：" + lastReason);
         }
 

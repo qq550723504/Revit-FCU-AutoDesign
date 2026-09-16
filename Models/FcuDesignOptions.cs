@@ -8,6 +8,7 @@ namespace FCUAutoDesign
         public double DoorOffsetMm { get; set; }
         public double FcuElevationMm { get; set; }
         public double ValveClearanceMm { get; set; }
+        public double? MinimumStraightLengthMm { get; set; }
         public double FlipDropMm { get; set; }
         public double CoolingIndexWPerSquareMeter { get; set; }
         public bool EnableAutoSizing { get; set; }

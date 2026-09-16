@@ -58,8 +58,13 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="100"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="供回水阀门预留段 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBlock Text="接管目标距离 (mm):" ToolTip="FCU 接口到首个转弯中心的目标距离；400 mm 为试用默认值，并非规范值。" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
                         <TextBox x:Name="TxtValveClearance" Grid.Column="1" Text="400" Background="#0f172a" Foreground="#34d399" BorderBrush="#475569" Padding="4"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="最小净直管 (mm，可空):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBox x:Name="TxtMinimumStraight" Grid.Column="1" Text="" ToolTip="根据实际设备、管件及安装详图填写。生成管件后检查剩余直管净长，不允许低于此值。留空表示未校验工程最小值，并禁止自动缩短目标首段。" Background="#0f172a" Foreground="#34d399" BorderBrush="#475569" Padding="4"/>
                     </Grid>
 
                     <Grid Margin="0,0,0,10">
@@ -67,14 +72,14 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="100"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="向下翻弯避让高差 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBlock Text="避让下翻起始高差 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
                         <TextBox x:Name="TxtFlipDrop" Grid.Column="1" Text="150" Background="#0f172a" Foreground="#f43f5e" BorderBrush="#475569" Padding="4"/>
                     </Grid>
 
 
 
                     <StackPanel IsEnabled="{Binding IsChecked, ElementName=ChkEnableCondensate}">
-                        <TextBlock Text="冷凝水逐房间执行并记录日志，遇未完成或失败暂停后续房间。每房间先预筛，最多试建 12 次，10 秒后不再启动新试建；遇障碍可缩短首段。" Foreground="#94a3b8" FontSize="11" TextWrapping="Wrap"/>
+                        <TextBlock Text="三路均先尝试不下翻的路线，再尝试下翻避让；穿墙需水平正交，管件在墙外。填写最小净直管后才允许缩短目标首段。冷凝水最多试建 12 次，10 秒后停止新试建；仅验证模型连通，不验证排水坡度。" Foreground="#94a3b8" FontSize="11" TextWrapping="Wrap"/>
                     </StackPanel>
 
                     <!-- 功能控制开关 (已修复 XAML 转义与参数接通) -->
@@ -82,7 +87,7 @@
                         <StackPanel>
                             <CheckBox x:Name="ChkAutoDn" Content="按面积分档选择管径 (&lt;25㎡: DN20, ≥25㎡: DN25)" IsChecked="True" Foreground="#93c5fd" Margin="0,3,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkBusinessPreview" Content="启用 FCU-201 业务规则预览（确认后继续现有 PoC）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
-                            <CheckBox x:Name="ChkEnableReturn" Content="连接走廊回水主管 (双管对称下翻与打断并网)" IsChecked="True" Foreground="#c084fc" Margin="0,6,0,0" FontSize="11"/>
+                            <CheckBox x:Name="ChkEnableReturn" Content="连接走廊回水主管" IsChecked="True" Foreground="#c084fc" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkEnableCondensate" Content="选择冷凝水主管并接入（失败时回滚冷凝水操作）" IsChecked="False" Foreground="#fcd34d" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkBreakCurve" Content="供回水主管打断并插入三通（失败时回滚打断）" IsChecked="True" Foreground="#86efac" Margin="0,6,0,0" FontSize="11"/>
                         </StackPanel>

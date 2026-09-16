@@ -2,6 +2,29 @@
 
 本轮目标：指定一个 FCU 类型，在一个房间中放置设备，并验证供回水接口到各自主管的完整模型连接链。
 
+## 2026-09-16 直达路线、首段安装净长与墙体检查
+
+三路优先不下翻；新增可空的最小净直管参数，接入候选校验与提交后复核。未指定时禁止自动缩短首段。使用 Revit 原生实体交线及干涉过滤器检查宿主直墙穿越和墙内管件，无新增第三方依赖。
+
+PASS 命令和真实输出：
+
+```text
+MSBuild FCUAutoDesign.csproj /t:Rebuild /p:Configuration=Release /p:Platform=x64 /p:RevitVersion=2020 /nologo /verbosity:minimal
+FCUAutoDesign -> bin\Release\FCUAutoDesign.dll (Exit 0)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Verify-LowerFlipRoute.ps1
+47 checks passed; 3132 active route candidates validated.
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File tests/Verify-Dialog.ps1 -AssemblyPath .\bin\Release\FCUAutoDesign.dll
+42 checks passed. Revit geometry/connection tests are NOT_RUN by this script.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Verify-OutletLead.ps1
+24 outlet obstacle checks passed. Reproduced 261 blocked old candidates.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Verify-MainPipeSegments.ps1
+14 segment checks passed. Revit batch integration tests are NOT_RUN.
+```
+
+覆盖同标高省弯、主管高低差、折返/短段、管件占长后的净长下限及 WPF 参数读取。几何测试的墙后升降案例只验证折线次序，不证明真实墙体穿越。
+
+NOT_RUN：真实 Revit 宿主墙正交穿越、墙内弯头拒绝、弯头占长、管壁擦墙、墙面转折、候选回滚、多房间性能及提交后复核。需使用干净模型副本。未确认工程安装尺寸；链接模型、保温/套管净距及排水性能未覆盖。本地检查无失败；未执行的模型项不得记为通过，FCU-206 整体仍未验收。
+
 不包含设备容量选型、水力计算、障碍物检测、净距检查、跨链接模型拾取和完整冷凝水排放。面积分档只用于选择 DN20 / DN25。
 
 ## 2026-09-13 连接方向失败跟进

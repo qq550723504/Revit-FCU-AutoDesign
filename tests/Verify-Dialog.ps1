@@ -57,5 +57,17 @@ try {
     $window.FindName('ChkEnableCondensate').IsChecked = $true
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Custom parameters accepted without slope setting'
     Assert-True ($window.DoorOffsetMm -eq 900) 'Custom distance preserved'
+    Assert-True ($null -eq $window.MinimumStraightLengthMm) 'No fabricated engineering minimum'
+    foreach ($bad in '0', '-1', 'NaN', 'Infinity', '400', '450', 'abc') {
+        $window.FindName('TxtMinimumStraight').Text = $bad
+        Assert-True (-not [bool]$readParameters.Invoke($window, @())) "Invalid net minimum rejected: $bad"
+        Assert-True ($null -eq $window.MinimumStraightLengthMm) 'Rejected minimum does not overwrite state'
+    }
+    $window.FindName('TxtMinimumStraight').Text = '200'
+    Assert-True ([bool]$readParameters.Invoke($window, @())) 'Explicit installation minimum accepted'
+    Assert-True ($window.MinimumStraightLengthMm -eq 200) 'Installation minimum retained'
+    $window.FindName('TxtMinimumStraight').Text = ''
+    Assert-True ([bool]$readParameters.Invoke($window, @())) 'Minimum may be cleared'
+    Assert-True ($null -eq $window.MinimumStraightLengthMm) 'Cleared minimum is unknown, not zero'
 } finally { $window.Close() }
 Write-Output "$script:checks checks passed. Revit geometry/connection tests are NOT_RUN by this script."

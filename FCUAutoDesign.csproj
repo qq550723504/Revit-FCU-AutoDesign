@@ -79,6 +79,7 @@
     <Compile Include="Services\FcuPlacementService.cs" />
     <Compile Include="Services\FcuTypeCatalog.cs" />
     <Compile Include="Services\HydronicConnectionService.cs" />
+    <Compile Include="Services\ConnectionInstallationVerifier.cs" />
     <Compile Include="Services\HydronicSeparationService.cs" />
     <Compile Include="Services\CondensateSeparationService.cs" />
     <Compile Include="Services\CircuitInterferenceVerifier.cs" />
@@ -86,6 +87,7 @@
     <Compile Include="Models\CondensateDrainResult.cs" />
     <Compile Include="Geometry\CondensateRoutePlanner.cs" />
     <Compile Include="Geometry\LowerFlipRoutePlanner.cs" />
+    <Compile Include="Geometry\InstallationClearance.cs" />
     <Compile Include="Geometry\OutletLeadPlanner.cs" />
     <Compile Include="Geometry\SegmentClearance.cs" />
     <Compile Include="Services\RoutingDiagnostic.cs" />

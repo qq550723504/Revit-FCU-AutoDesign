@@ -24,7 +24,7 @@ namespace FCUAutoDesign
             string circuit,
             RollBackOnErrorPreprocessor failureReporter, MainPipeRun run = null,
             MEPSystemClassification? expectedClassificationOverride = null,
-            double lateralOffset = 0, double? minimumStraightLength = null)
+            double lateralOffset = 0, double? minimumStraightLength = null, double preLateralOffset = 0)
         {
             InstallationClearance.ValidateMinimum(minimumStraightLength);
             if (fcuConn == null || fcuConn.IsConnected)
@@ -34,7 +34,7 @@ namespace FCUAutoDesign
             double minLength = Math.Max(doc.Application.ShortCurveTolerance, MM_TO_FEET);
             Point3D[] approach = LowerFlipRoutePlanner.Approach(Point(startPt),
                 new Vector3D(connDir.X, connDir.Y, connDir.Z),
-                valveClearance, flipDrop, lateralOffset, minLength);
+                valveClearance, flipDrop, lateralOffset, minLength, preLateralOffset);
             Point3D approachEnd = approach[approach.Length - 1];
             if (run != null)
                 mainPipe = run.Resolve(doc, new XYZ(approachEnd.X, approachEnd.Y, approachEnd.Z));

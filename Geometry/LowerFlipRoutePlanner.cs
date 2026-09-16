@@ -8,24 +8,33 @@ namespace FCUAutoDesign
     internal static class LowerFlipRoutePlanner
     {
         public static Point3D[] Approach(Point3D start, Vector3D outward,
-            double lead, double drop, double lateral, double minLength)
+            double lead, double drop, double lateral, double minLength, double preLateral = 0)
         {
             if (!Valid(start) || !Finite(outward.X) || !Finite(outward.Y) || !Finite(outward.Z)
                 || outward.Length < 1e-9 || Math.Abs(outward.Z) > 1e-6)
                 throw new InvalidOperationException("接口必须具有有效的水平出管方向。");
             if (!Finite(minLength) || minLength <= 0 || !Finite(lead) || lead <= minLength
                 || !Finite(drop) || drop < 0 || (drop != 0 && drop <= minLength) || !Finite(lateral)
+                || !Finite(preLateral)
                 || (lateral != 0 && Math.Abs(lateral) <= minLength))
                 throw new InvalidOperationException("路径长度无效或过短。");
 
             outward.Z = 0;
             outward.Normalize();
+            Vector3D side = new Vector3D(-outward.Y, outward.X, 0);
+            var points = new List<Point3D> { start };
+            if (preLateral != 0)
+            {
+                if (Math.Abs(preLateral) <= minLength) throw new InvalidOperationException("设备侧先横移段过短。");
+                start += side * preLateral;
+                points.Add(start);
+            }
             Point3D leadEnd = start + outward * lead;
-            var points = new List<Point3D> { start, leadEnd };
+            points.Add(leadEnd);
             if (lateral != 0)
             {
                 // 横移必须在下翻之前，避免横移与主管接近段共线或折返。
-                leadEnd += new Vector3D(-outward.Y, outward.X, 0) * lateral;
+                leadEnd += side * lateral;
                 points.Add(leadEnd);
             }
             if (drop != 0) points.Add(leadEnd - new Vector3D(0, 0, drop));

@@ -116,6 +116,10 @@ namespace FCUAutoDesign
             Check(down.Length == 4 && down[2] == P(.4,4,3) && RightAngles(down), "Drop is after horizontal wall crossing");
             var up = LowerFlipRoutePlanner.Complete(direct,P(.4,4,4),.001);
             Check(up.Length == 4 && up[2] == P(.4,4,3) && RightAngles(up), "Rise is after horizontal wall crossing");
+            var preShift = LowerFlipRoutePlanner.Approach(start,dir,.4,0,0,.001,.2);
+            Check(preShift.Length == 3 && preShift[1] == P(.0,.2,3) && preShift[2] == P(.4,.2,3)
+                && RightAngles(LowerFlipRoutePlanner.Complete(preShift,P(.4,4,3),.001)),
+                "Device-side shift can precede wall crossing");
             Check(LowerFlipRoutePlanner.Complete(direct,P(4,0,3),.001).Length == 2, "Aligned run is a single straight pipe");
             Reject(()=>LowerFlipRoutePlanner.Complete(direct,P(.2,0,3),.001), "Direct reversal remains rejected");
             Reject(()=>LowerFlipRoutePlanner.Complete(direct,P(.4,.0001,3),.001), "Short nonzero section is not swallowed");

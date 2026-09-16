@@ -4,6 +4,14 @@
 
 ## 2026-09-16 直达路线、首段安装净长与墙体检查
 
+### 后续回归修复：第二房间墙内转弯未尝试设备侧先横移
+
+用户现场结果：首房间连接完成，第二房间部分完成；冷凝水预筛 22、跳过 10、试建 12，12 次均因墙 `373443` 判定首段/转弯位于墙内或墙面而回滚。诊断文件 `route-20260916-024627-ef1434c6fad24a46b3ab890c968738b7.txt` 显示障碍前转弯长度为 258/193.5/129 mm；400 mm 正常路线被已有供水下翻管预筛挡住，原算法没有“设备侧先横移、再水平穿墙”的候选。本次现场结果为 FAIL。
+
+修复：路径规划新增设备侧先横移段，优先尝试“先横移避开供水下翻 → 保留直段穿墙 → 过墙后上翻/下翻接主管”，并保留原横移后下翻候选。横移和转弯仍受短段、墙体实体和供回水/冷凝水实体检查约束；候选失败继续完整回滚。新增几何回归覆盖先横移路径。
+
+PASS：Release/Revit2020 Rebuild Exit 0；`Verify-LowerFlipRoute.ps1` 输出 `48 checks passed; 3132 active route candidates validated`；`Verify-OutletLead.ps1` 输出 `28 outlet obstacle checks passed`；`Verify-Dialog.ps1 -AssemblyPath .\bin\Release\FCUAutoDesign.dll` 输出 `42 checks passed`；`Verify-MainPipeSegments.ps1` 输出 `14 segment checks passed`。真实 Revit 连接及墙体场景为 NOT_RUN，不能以本地几何检查替代客户模型复测。
+
 ### 后续回归修复：冷凝水结果传递丢失首段管 ID
 
 用户 0a6cd0e 截图：首房间 1.98 秒后失败并回滚，后两房间未执行，Revit 报 `Document.GetElement` 参数 `id` 为空。对应 `route-20260916-022227-750bb3e347b14cda999b0edc11e49499.txt` 记录冷凝水第 3 次试建 252 mm 首段、150 mm 下翻在 489 ms 通过候选检查。候选通过不代表主事务/事务组验收成功；本次整体为 FAIL。

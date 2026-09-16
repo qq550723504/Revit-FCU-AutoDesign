@@ -41,6 +41,7 @@ namespace FCUAutoDesign
             int connectorId = connector.Id;
             double step = Math.Max(100 * MM_TO_FEET, diameter * 4);
             int[] lateralSteps = { 0, -1, 1, -2, 2 };
+            int[] preLateralSteps = { 0, -1, 1, -2, 2 };
             XYZ origin = connector.Origin, direction = connector.CoordinateSystem.BasisZ;
             var trace = new RoutingDiagnostic(ownerId.IntegerValue);
             Line selectedMain = (main.Location as LocationCurve)?.Curve as Line;
@@ -63,11 +64,13 @@ namespace FCUAutoDesign
             double[] leads = new[] { leadLength }.Concat(earlyLeads).Concat(Enumerable.Range(1, MaxCandidateStep)
                 .Select(i => leadLength + i * step)).ToArray();
 
+            foreach (int preLateralStep in preLateralSteps)
             foreach (bool direct in new[] { true, false })
             foreach (int lateralStep in lateralSteps)
             {
                 // 无下翻最多试三个长度，为下翻避让保留试建预算。
                 if (direct && lateralStep != 0) continue;
+                if (preLateralStep != 0 && lateralStep != 0) continue;
                 int maxDropStep = lateralStep == 0 ? MaxCandidateStep : 4;
                 foreach (double candidateLead in direct ? leads.Take(3) : leads)
                 {
@@ -75,6 +78,7 @@ namespace FCUAutoDesign
                     {
                         double candidateDrop = direct ? 0 : drop + dropStep * step;
                         double candidateLateral = lateralStep * step;
+                        double candidatePreLateral = preLateralStep * step;
                         if (attempts >= MaxModelAttempts || trace.Clock.Elapsed.TotalSeconds >= 10)
                         {
                             lastReason = "达到诊断预算，停止新试建；未穷尽所有路线。";
@@ -83,7 +87,7 @@ namespace FCUAutoDesign
                         screened++;
                         Point3D[] prefix = LowerFlipRoutePlanner.Approach(
                             new Point3D(origin.X, origin.Y, origin.Z), new Vector3D(direction.X,direction.Y,direction.Z),
-                            candidateLead,candidateDrop,candidateLateral,minLength);
+                            candidateLead,candidateDrop,candidateLateral,minLength,candidatePreLateral);
                         string blocked = null;
                         foreach (PipeObstacle obstacle in obstacles)
                         {
@@ -97,7 +101,8 @@ namespace FCUAutoDesign
                         {
                             skipped++;
                             trace.Add("PREFILTER "+blocked+" lead/drop/lateral(mm)="
-                                +RoutingDiagnostic.Point(new XYZ(candidateLead,candidateDrop,candidateLateral)));
+                                +RoutingDiagnostic.Point(new XYZ(candidateLead,candidateDrop,candidateLateral))
+                                +" preLateral="+(candidatePreLateral * FEET_TO_MM).ToString("F0"));
                             continue;
                         }
                         attempts++;
@@ -116,7 +121,7 @@ namespace FCUAutoDesign
                                 TeeConnectionResult connectionResult = connection.ConnectWithLowerFlipAndTee(
                                     doc, current, currentMain, diameter, candidateDrop, candidateLead, true,
                                     "冷凝水", reporter, run, MEPSystemClassification.Sanitary,
-                                    candidateLateral, minimumStraightLength);
+                                    candidateLateral, minimumStraightLength, candidatePreLateral);
                                 trace.Add("BUILD returned");
                                 if (!connectionResult.BranchCreated || !connectionResult.TeeCreated)
                                     throw new InvalidOperationException(connectionResult.ErrorMessage ?? "冷凝水连接未完成。");

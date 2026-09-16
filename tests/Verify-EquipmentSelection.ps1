@@ -50,9 +50,16 @@ namespace FCUAutoDesign.Business.EquipmentSelection
             var e02 = Calculator.Calculate(Input(6, 5), Catalog);
             Check(e02.Success && e02.UnitCount == 2 && e02.UnitDesignLoadKw == 3
                 && e02.SelectedEquipment.ModelCode == "FP-68"
-                && System.Math.Abs(e02.PlacementPoints[0].XAlongLengthM - 2) < 1e-9
-                && System.Math.Abs(e02.PlacementPoints[1].XAlongLengthM - 4) < 1e-9,
-                "6x5 produces two evenly divided points");
+                && System.Math.Abs(e02.PlacementPoints[0].XAlongLengthM - 1.5) < 1e-9
+                && System.Math.Abs(e02.PlacementPoints[1].XAlongLengthM - 4.5) < 1e-9,
+                "6x5 produces quarter-edge points from the customer rule");
+
+            var e03Points = Calculator.Calculate(Input(15, 5), Catalog);
+            Check(e03Points.Success && e03Points.UnitCount == 3
+                && System.Math.Abs(e03Points.PlacementPoints[0].XAlongLengthM - 2.5) < 1e-9
+                && System.Math.Abs(e03Points.PlacementPoints[1].XAlongLengthM - 7.5) < 1e-9
+                && System.Math.Abs(e03Points.PlacementPoints[2].XAlongLengthM - 12.5) < 1e-9,
+                "15x5 produces L/6, L/2 and 5L/6 points");
 
             var e03 = Calculator.Calculate(Input(10, 4), Catalog);
             Check(e03.Success && e03.UnitCount == 2 && e03.SelectedEquipment.ModelCode == "FP-85",

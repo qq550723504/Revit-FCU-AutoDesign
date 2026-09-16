@@ -15,7 +15,7 @@ namespace FCUAutoDesign.Business.EquipmentSelection
             string preferredModelCode = null)
         {
             if (input == null)
-                throw new ArgumentNullException(nameof(input));
+                throw new ArgumentNullException("input");
 
             EquipmentSelectionResult result = new EquipmentSelectionResult();
             List<EquipmentCatalogEntry> entries = catalog == null
@@ -80,7 +80,9 @@ namespace FCUAutoDesign.Business.EquipmentSelection
                 result.PlacementPoints.Add(new EquipmentPlacementPoint
                 {
                     Sequence = i,
-                    XAlongLengthM = input.LengthM * i / (result.UnitCount + 1),
+                    // 客户布置图：两端各半个间距，设备之间为一个间距。
+                    // x_i = (2i - 1)L / (2FP)，例如 3 台为 L/6、L/2、5L/6。
+                    XAlongLengthM = input.LengthM * (2 * i - 1) / (2.0 * result.UnitCount),
                     YFromReferenceEdgeM = input.PlacementOffsetM,
                     AbsoluteElevationM = input.BaseElevationM + input.InstallationHeightM
                 });

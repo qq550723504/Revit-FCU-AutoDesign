@@ -19,11 +19,25 @@ namespace FCUAutoDesign
         }
         public void Register(FcuDesignResult result)
         {
+            if (result.UnitResults.Count > 0)
+            {
+                foreach (FcuDesignResult unit in result.UnitResults) Register(unit);
+                return;
+            }
             Supply.Register(result.SupplyConnection);
             Return?.Register(result.ReturnConnection);
             Condensate?.Register(result.DrainConnection);
             completed.Add(result);
         }
+        private RoomBatchContext(RoomBatchContext source)
+        {
+            Supply = source.Supply.Fork();
+            Return = source.Return?.Fork();
+            Condensate = source.Condensate?.Fork();
+            completed.AddRange(source.completed);
+        }
+        // New segment IDs remain private until the whole room has committed.
+        public RoomBatchContext Fork() { return new RoomBatchContext(this); }
         public void VerifyNew(Document doc, TeeConnectionResult candidate)
         {
             foreach (FcuDesignResult previous in completed)

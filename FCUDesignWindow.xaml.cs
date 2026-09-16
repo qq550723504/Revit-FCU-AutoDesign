@@ -14,6 +14,7 @@ namespace FCUAutoDesign
         public double CoolingIndexWPerSquareMeter { get; private set; } = 200;
         public bool EnableAutoSizing { get; private set; } = true;
         public bool EnableBusinessRulePreview { get; private set; } = true;
+        public bool EnableMultipleFcus { get; private set; } = true;
         public bool EnableReturnPipe { get; private set; } = true;
         public bool EnableCondensate { get; private set; } = false;
         public bool BreakCurveAndTee { get; private set; } = true;
@@ -41,6 +42,7 @@ namespace FCUAutoDesign
 
             EnableAutoSizing = ChkAutoDn.IsChecked == true;
             EnableBusinessRulePreview = ChkBusinessPreview.IsChecked == true;
+            EnableMultipleFcus = ChkMultipleFcus.IsChecked == true;
             EnableReturnPipe = ChkEnableReturn.IsChecked == true;
             EnableCondensate = ChkEnableCondensate.IsChecked == true;
             BreakCurveAndTee = ChkBreakCurve.IsChecked == true;

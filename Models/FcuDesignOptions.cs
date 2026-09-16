@@ -5,6 +5,7 @@ namespace FCUAutoDesign
     internal class FcuDesignOptions
     {
         public int SelectedFcuTypeId { get; set; }
+        public bool EnableMultipleFcus { get; set; }
         public double DoorOffsetMm { get; set; }
         public double FcuElevationMm { get; set; }
         public double ValveClearanceMm { get; set; }

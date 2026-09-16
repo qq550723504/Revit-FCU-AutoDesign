@@ -22,12 +22,16 @@ namespace FCUAutoDesign
                 if (!room.NotRun) details.AppendLine($"本房间执行耗时 {room.Elapsed.TotalSeconds:F2} 秒。");
                 if (room.Design != null)
                 {
-                    ExecutionOutcome o = room.Design.Outcome;
-                    details.AppendLine($"FCU ID {o.FcuId.IntegerValue}；面积 {room.Design.RoomAreaSqm:F1} ㎡；支管 DN{room.Design.ActualDn}。");
-                    details.AppendLine($"供水：{(o.SupplyTeeConnected ? "已接主管" : o.SupplyBranchCreated ? "支管已生成，未接主管" : "未完成")}；"
-                        + $"回水：{(!options.EnableReturnPipe ? "未启用" : o.ReturnTeeConnected ? "已接主管" : "未完成/已跳过")}；"
-                        + $"冷凝水：{(!options.EnableCondensate ? "未启用" : o.CondensateConnected ? "已接主管" : "未完成")}。");
-                    foreach (string warning in o.Warnings) details.AppendLine("提示：" + warning);
+                    details.AppendLine($"本房间 {room.Design.Devices.Count()} 台 FCU；面积 {room.Design.RoomAreaSqm:F1} ㎡。");
+                    foreach (FcuDesignResult device in room.Design.Devices)
+                    {
+                        ExecutionOutcome o = device.Outcome;
+                        details.AppendLine($"FCU ID {o.FcuId.IntegerValue}；支管 DN{device.ActualDn}。");
+                        details.AppendLine($"供水：{(o.SupplyTeeConnected ? "已接主管" : o.SupplyBranchCreated ? "支管已生成，未接主管" : "未完成")}；"
+                            + $"回水：{(!options.EnableReturnPipe ? "未启用" : o.ReturnTeeConnected ? "已接主管" : "未完成/已跳过")}；"
+                            + $"冷凝水：{(!options.EnableCondensate ? "未启用" : o.CondensateConnected ? "已接主管" : "未完成")}。");
+                        foreach (string warning in o.Warnings) details.AppendLine("提示：" + warning);
+                    }
                 }
                 if (!string.IsNullOrEmpty(room.Error)) details.AppendLine(room.Error);
                 details.AppendLine();

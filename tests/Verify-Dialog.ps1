@@ -28,6 +28,7 @@ function New-TestWindow {
 
 foreach ($action in 'BtnRun','BtnCancel','Close') {
     $window = New-TestWindow
+    $window.FindName('ChkMultipleFcus').IsChecked = $false
     $callback = {
         if ($action -eq 'Close') { $this.Close(); return }
         $this.FindName($action).RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Button]::ClickEvent)))
@@ -36,11 +37,13 @@ foreach ($action in 'BtnRun','BtnCancel','Close') {
     $result = $window.ShowDialog()
     $expected = $action -eq 'BtnRun'
     Assert-True ($result -eq $expected -and $window.IsConfirmed -eq $expected) "Modal action $action returns the correct command outcome"
+    if ($expected) { Assert-True (-not $window.EnableMultipleFcus) 'Unchecked multi-FCU option reaches confirmed parameters' }
 }
 
 $window = New-TestWindow
 try {
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Default parameters accepted'
+    Assert-True ($window.FindName('ChkMultipleFcus').IsChecked -eq $true -and $window.EnableMultipleFcus) 'Multi-FCU placement enabled by default'
     Assert-True ($null -eq $window.FindName('TxtCondensateSlope')) 'No condensate slope input exists'
     $window.FindName('ChkEnableCondensate').IsChecked = $true
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Enabled condensate needs no slope setting'

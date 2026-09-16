@@ -34,11 +34,11 @@ namespace FCUAutoDesign.Business.EquipmentSelection
                 return Fail(result, EquipmentSelectionErrorCode.ZeroLoadRequiresConfirmation,
                     "冷指标为零，输入合法但零负荷是否布置设备尚未确认。");
 
-            if (input.LengthM > MaxSupportedLengthM + Epsilon)
+            if (input.LengthM > MaxSupportedLengthM)
                 return Fail(result, EquipmentSelectionErrorCode.LengthOutsideSupportedRange,
                     "L 超出 40m 的已确认台数规则范围，不自动外推台数。");
 
-            result.UnitCount = (int)Math.Ceiling(input.LengthM / 5.0);
+            result.UnitCount = EquipmentPlacementPlanner.GetUnitCount(input.LengthM);
             result.UnitDesignLoadKw = result.DesignLoadKw / result.UnitCount;
 
             if (entries.Count == 0)

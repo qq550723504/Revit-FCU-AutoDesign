@@ -18,6 +18,56 @@ namespace FCUAutoDesign
         public FcuDesignResult Execute(Document doc, Room room, Pipe supplyMainPipe,
             Pipe returnMainPipe, Pipe condensateMainPipe, FcuDesignOptions options, RoomBatchContext batch = null)
         {
+            if (!options.EnableMultipleFcus)
+                return ExecuteSingle(doc, room, supplyMainPipe, returnMainPipe, condensateMainPipe, options, batch);
+            var points = placement.PlanPoints(doc, room, options);
+            if (points.Count == 1)
+                return ExecuteSingle(doc, room, supplyMainPipe, returnMainPipe, condensateMainPipe, options, batch, points[0]);
+            RoomBatchContext working = (batch ?? new RoomBatchContext(supplyMainPipe, returnMainPipe, condensateMainPipe)).Fork();
+            var result = new FcuDesignResult { RoomAreaSqm = room.Area * SQFT_TO_SQM };
+            using (TransactionGroup roomGroup = new TransactionGroup(doc, "同房间多台 FCU"))
+            {
+                roomGroup.Start();
+                for (int i = 0; i < points.Count; i++)
+                {
+                    FcuDesignResult unit = ExecuteSingle(doc, room, working.Supply.AnySegment(doc),
+                        working.Return?.AnySegment(doc), working.Condensate?.AnySegment(doc), options, working, points[i]);
+                    ExecutionOutcome o = unit.Outcome;
+                    bool connected = o.SupplyBranchCreated && (!options.BreakCurveAndTee || o.SupplyTeeConnected)
+                        && (!options.EnableReturnPipe || (o.ReturnBranchCreated && (!options.BreakCurveAndTee || o.ReturnTeeConnected)))
+                        && (!options.EnableCondensate || o.CondensateConnected);
+                    if (!connected)
+                        throw new InvalidOperationException($"第 {i + 1}/{points.Count} 台接管未完成，已回滚本房间全部新设备及管线。"
+                            + Environment.NewLine + string.Join(Environment.NewLine, o.Warnings));
+                    o.Warnings.Add($"同房间第 {i + 1}/{points.Count} 台；沿门侧墙等分布置，使用用户指定族类型，未验证目录容量映射。支管仍采用现有 PoC 管径设置。");
+                    working.Register(unit);
+                    result.UnitResults.Add(unit);
+                }
+                working.VerifyPrevious(doc, null, null, null);
+                foreach (FcuDesignResult unit in result.UnitResults)
+                {
+                    FamilyInstance live = doc.GetElement(unit.Outcome.FcuId) as FamilyInstance;
+                    LocationPoint location = live?.Location as LocationPoint;
+                    if (location == null || !room.IsPointInRoom(location.Point)
+                        || location.Point.DistanceTo(unit.Outcome.PlacementPoint) > MM_TO_FEET)
+                        throw new InvalidOperationException("多台接管后设备位置发生变化，已回滚本房间。");
+                    placement.VerifySupplyOutletDirection(live, unit.ExpectedOutletDirection);
+                    ConnectionInstallationVerifier.Verify(doc, unit.SupplyConnection);
+                    ConnectionInstallationVerifier.Verify(doc, unit.ReturnConnection);
+                    ConnectionInstallationVerifier.Verify(doc, unit.DrainConnection);
+                }
+                if (roomGroup.Assimilate() != TransactionStatus.Committed)
+                    throw new InvalidOperationException("多台 FCU 房间事务组未提交。");
+            }
+            result.ActualDn = result.UnitResults[0].ActualDn;
+            result.CoolingLoadKw = result.UnitResults[0].CoolingLoadKw;
+            return result;
+        }
+
+        private FcuDesignResult ExecuteSingle(Document doc, Room room, Pipe supplyMainPipe,
+            Pipe returnMainPipe, Pipe condensateMainPipe, FcuDesignOptions options,
+            RoomBatchContext batch, XYZ plannedPoint = null)
+        {
             double roomAreaSqm = room.Area * SQFT_TO_SQM;
             double coolingLoadKw = roomAreaSqm * 0.160; // 160 W/m² 指标估算
             int actualDn = 20;
@@ -62,7 +112,7 @@ namespace FCUAutoDesign
                     failOpt.SetClearAfterRollback(true);
                     trans.SetFailureHandlingOptions(failOpt);
 
-                    FcuPlacementResult placed = placement.Place(doc, room, options);
+                    FcuPlacementResult placed = placement.Place(doc, room, options, plannedPoint);
                     FamilyInstance fcu = placed.Instance;
                     expectedOutletDirection = placed.ExpectedOutletDirection;
                     outcome.PlacementVerified = true;
@@ -176,7 +226,7 @@ namespace FCUAutoDesign
 
             return new FcuDesignResult
             {
-                Outcome = outcome, RoomAreaSqm = roomAreaSqm,
+                Outcome = outcome, ExpectedOutletDirection = expectedOutletDirection, RoomAreaSqm = roomAreaSqm,
                 CoolingLoadKw = coolingLoadKw, ActualDn = actualDn,
                 SupplyConnection = supplyResult, ReturnConnection = returnResult,
                 DrainConnection = drainResult?.Connected == true ? drainResult.Connection : null

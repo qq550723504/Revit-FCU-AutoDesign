@@ -11,9 +11,13 @@
         {
             if (NotRun) return "未执行";
             if (Design == null) return "失败（已回滚）";
-            ExecutionOutcome o = Design.Outcome;
-            return o.SupplyTeeConnected && (!options.EnableReturnPipe || o.ReturnTeeConnected)
-                && (!options.EnableCondensate || o.CondensateConnected) ? "连接完成" : "部分完成";
+            foreach (FcuDesignResult device in Design.Devices)
+            {
+                ExecutionOutcome o = device.Outcome;
+                if (!o.SupplyTeeConnected || (options.EnableReturnPipe && !o.ReturnTeeConnected)
+                    || (options.EnableCondensate && !o.CondensateConnected)) return "部分完成";
+            }
+            return "连接完成";
         }
     }
 }

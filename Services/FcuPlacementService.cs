@@ -13,7 +13,30 @@ namespace FCUAutoDesign
         private readonly FcuConnectorResolver connectors = new FcuConnectorResolver();
 
         // 调用方必须已开启主事务；此服务不提交主事务。
-        public FcuPlacementResult Place(Document doc, Room room, FcuDesignOptions options)
+        public IList<XYZ> PlanPoints(Document doc, Room room, FcuDesignOptions options)
+        {
+            FamilyInstance door = FindDoorForRoom(doc, room, options);
+            RoomRuleSnapshot snapshot = new RoomRuleSnapshotReader().Read(doc, room, door);
+            if (!snapshot.IsValid) throw new InvalidOperationException(snapshot.ErrorMessage);
+            Wall wall = door.Host as Wall;
+            XYZ center = RoomRuleSnapshotReader.GetDoorWallOffsetCenter(doc, room, wall, options.DoorOffsetMm);
+            if (center == null) throw new InvalidOperationException("无法确定距门侧墙的合法布置基线。未放置设备。");
+            XYZ axis = ((wall.Location as LocationCurve).Curve as Line).Direction;
+            var planner = new Business.EquipmentSelection.EquipmentPlacementPlanner();
+            var local = planner.Build(snapshot.LengthM, snapshot.WidthM, snapshot.BaseElevationM,
+                options.FcuElevationMm / 1000.0, options.DoorOffsetMm / 1000.0,
+                Business.EquipmentSelection.EquipmentPlacementPlanner.GetUnitCount(snapshot.LengthM));
+            var points = local.Select(p =>
+            {
+                XYZ xy = center + axis * ((p.XAlongLengthM - snapshot.LengthM / 2) * 1000 * MM_TO_FEET);
+                return new XYZ(xy.X, xy.Y, p.AbsoluteElevationM * 1000 * MM_TO_FEET);
+            }).ToList();
+            if (points.Any(p => !room.IsPointInRoom(p)))
+                throw new InvalidOperationException("至少一个多台 FCU 落点不在房间体积内；整间未放置，请检查边界、内缩距离和标高。");
+            return points;
+        }
+
+        public FcuPlacementResult Place(Document doc, Room room, FcuDesignOptions options, XYZ plannedPoint = null)
         {
             if (room.Level == null || room.Area <= 0 || room.get_BoundingBox(null) == null)
                 throw new InvalidOperationException("目标房间必须具有有效标高、面积和边界。");
@@ -61,7 +84,7 @@ namespace FCUAutoDesign
                     }
                 }
 
-                XYZ targetPoint = RoomRuleSnapshotReader.GetDoorWallOffsetCenter(
+                XYZ targetPoint = plannedPoint ?? RoomRuleSnapshotReader.GetDoorWallOffsetCenter(
                     doc, room, doorWall, options.DoorOffsetMm);
                 if (targetPoint != null)
                 {

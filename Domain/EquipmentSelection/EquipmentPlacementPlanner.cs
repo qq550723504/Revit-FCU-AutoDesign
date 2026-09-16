@@ -10,6 +10,13 @@ namespace FCUAutoDesign.Business.EquipmentSelection
     /// </summary>
     public sealed class EquipmentPlacementPlanner
     {
+        public static int GetUnitCount(double lengthM)
+        {
+            if (double.IsNaN(lengthM) || double.IsInfinity(lengthM) || lengthM <= 0 || lengthM > 40)
+                throw new ArgumentOutOfRangeException("lengthM", "台数规则仅支持 0 < L <= 40m。");
+            return (int)Math.Ceiling(lengthM / 5.0);
+        }
+
         public IList<EquipmentPlacementPoint> Build(
             double lengthM, double widthM, double baseElevationM,
             double installationHeightM, double placementOffsetM, int unitCount)
@@ -23,6 +30,10 @@ namespace FCUAutoDesign.Business.EquipmentSelection
                 throw new ArgumentOutOfRangeException("placementOffsetM");
             if (unitCount < 1)
                 throw new ArgumentOutOfRangeException("unitCount");
+            if (double.IsNaN(baseElevationM) || double.IsInfinity(baseElevationM)
+                || double.IsNaN(installationHeightM) || double.IsInfinity(installationHeightM)
+                || double.IsInfinity(baseElevationM + installationHeightM))
+                throw new ArgumentOutOfRangeException("baseElevationM");
 
             List<EquipmentPlacementPoint> points = new List<EquipmentPlacementPoint>(unitCount);
             for (int i = 1; i <= unitCount; i++)

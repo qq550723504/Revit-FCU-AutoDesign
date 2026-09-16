@@ -45,6 +45,21 @@ namespace FCUAutoDesign.Business.EquipmentSelection
 
         public static void Run()
         {
+            var planner = new EquipmentPlacementPlanner();
+            for (int n = 1; n <= 8; n++)
+            {
+                double length = n * 5.0;
+                var points = planner.Build(length, 4, -3, 2.6, 0.5, n);
+                Check(points.Count == n && Math.Abs(points[0].XAlongLengthM - 2.5) < 1e-9
+                    && Math.Abs(length - points[n - 1].XAlongLengthM - 2.5) < 1e-9
+                    && points.All(p => Math.Abs(p.AbsoluteElevationM + .4) < 1e-9 && p.YFromReferenceEdgeM == .5)
+                    && points.Zip(points.Skip(1), (a, b) => Math.Abs(b.XAlongLengthM - a.XAlongLengthM - 5) < 1e-9).All(x => x),
+                    "Half-edge spacing, elevation and wall offset hold for " + n + " units");
+            }
+            bool rejected = false;
+            try { planner.Build(10, 4, double.NaN, 2.6, .5, 2); }
+            catch (ArgumentOutOfRangeException) { rejected = true; }
+            Check(rejected, "Invalid elevation cannot produce model placement points");
             var e01 = Calculator.Calculate(Input(5, 5), Catalog);
             Check(e01.Success && e01.AreaSquareMeters == 25 && e01.DesignLoadKw == 5
                 && e01.UnitCount == 1 && e01.SelectedEquipment.ModelCode == "FP-102", "5x5 selects FP-102");
@@ -78,6 +93,8 @@ namespace FCUAutoDesign.Business.EquipmentSelection
             Check(Calculator.Calculate(Input(40), Catalog).UnitCount == 8, "L=40 uses eight units");
             Reject(Input(40.0001), EquipmentSelectionErrorCode.LengthOutsideSupportedRange,
                 "L>40 is not extrapolated");
+            Reject(Input(40.0000000001), EquipmentSelectionErrorCode.LengthOutsideSupportedRange,
+                "Floating-point boundary cannot silently create a ninth unit");
             for (double boundary = 5; boundary <= 40; boundary += 5)
             {
                 var exact = Calculator.Calculate(Input(boundary), Catalog);

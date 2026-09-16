@@ -56,7 +56,7 @@ namespace FCUAutoDesign
                         CoolingIndexWPerSquareMeter = options.CoolingIndexWPerSquareMeter,
                         BaseElevationM = snapshot.BaseElevationM,
                         InstallationHeightM = options.FcuElevationMm / 1000.0,
-                        PlacementOffsetM = 0.5
+                        PlacementOffsetM = options.DoorOffsetMm / 1000.0
                     }, PreviewCatalog);
                 if (!result.Success)
                 {
@@ -80,7 +80,10 @@ namespace FCUAutoDesign
             dialog.MainContent = string.Join(Environment.NewLine, lines)
                 + Environment.NewLine + Environment.NewLine
                 + "当前选择的 Revit 族类型：" + selectedTypeName + Environment.NewLine
-                + "确认后继续现有 PoC 接管事务；本轮预览不会自动替换族类型、修改管径或保存设计记录。";
+                + (options.EnableMultipleFcus
+                    ? "确认后按上述台数和点位放置，每台均使用所选 Revit 族类型；任一台接管失败，整间回滚。"
+                    : "多台放置未启用：确认后每间仅放置一台，以上台数和型号仅供预览。")
+                + "目录型号仍为建议，未自动替换族类型、修改管径或保存设计记录。";
             dialog.CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No;
             dialog.DefaultButton = TaskDialogResult.No;
             return dialog.Show() == TaskDialogResult.Yes;

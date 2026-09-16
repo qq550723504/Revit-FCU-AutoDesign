@@ -49,7 +49,7 @@ namespace FCUAutoDesign
                         batch.Return?.AnySegment(doc), batch.Condensate?.AnySegment(doc), options, batch);
                     batch.Register(design);
                     results[i].Design = design;
-                    if (options.EnableCondensate && !design.Outcome.CondensateConnected)
+                    if (options.EnableCondensate && design.Devices.Any(d => !d.Outcome.CondensateConnected))
                         stopped = "前一房间冷凝水未完成，受限批量已停止后续房间；请检查该房间报告及诊断文件。";
                 }
                 catch (Autodesk.Revit.Exceptions.RegenerationFailedException ex)

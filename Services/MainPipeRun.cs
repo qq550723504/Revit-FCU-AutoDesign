@@ -12,6 +12,8 @@ namespace FCUAutoDesign
     {
         private readonly HashSet<ElementId> segments = new HashSet<ElementId>();
         public MainPipeRun(Pipe initial) { segments.Add(initial.Id); }
+        private MainPipeRun(IEnumerable<ElementId> ids) { segments.UnionWith(ids); }
+        public MainPipeRun Fork() { return new MainPipeRun(segments); }
         public Pipe AnySegment(Document doc)
         {
             return segments.Select(id => doc.GetElement(id) as Pipe).FirstOrDefault(p => p != null)

@@ -31,7 +31,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="100"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="距门侧墙内侧距离 (mm):" ToolTip="FCU 中心到门所在墙室内侧的距离；默认 500 mm。沿墙方向取房间中部。" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBlock Text="距门侧墙内侧距离 (mm):" ToolTip="FCU 定位点到门所在墙室内侧的距离；默认 500 mm。多台沿墙等距布置，两端留半间距。" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
                         <TextBox x:Name="TxtDoorOffset" Grid.Column="1" Text="500" Background="#0f172a" Foreground="#38bdf8" BorderBrush="#475569" Padding="4"/>
                     </Grid>
 
@@ -87,6 +87,8 @@
                         <StackPanel>
                             <CheckBox x:Name="ChkAutoDn" Content="按面积分档选择管径 (&lt;25㎡: DN20, ≥25㎡: DN25)" IsChecked="True" Foreground="#93c5fd" Margin="0,3,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkBusinessPreview" Content="启用 FCU-201 业务规则预览（确认后继续现有 PoC）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
+                            <CheckBox x:Name="ChkMultipleFcus" Content="按 L/5 向上取整放置多台（均使用所选族类型）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
+                            <TextBlock Text="多台沿门侧墙等距布置，任一台接管失败则整间回滚；未自动匹配目录型号，支管仍为 PoC 管径。" TextWrapping="Wrap" Foreground="#94a3b8" FontSize="11"/>
                             <CheckBox x:Name="ChkEnableReturn" Content="连接走廊回水主管" IsChecked="True" Foreground="#c084fc" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkEnableCondensate" Content="选择冷凝水主管并接入（失败时回滚冷凝水操作）" IsChecked="False" Foreground="#fcd34d" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkBreakCurve" Content="供回水主管打断并插入三通（失败时回滚打断）" IsChecked="True" Foreground="#86efac" Margin="0,6,0,0" FontSize="11"/>

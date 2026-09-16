@@ -61,6 +61,7 @@ namespace FCUAutoDesign
                     CoolingIndexWPerSquareMeter = uiWindow.CoolingIndexWPerSquareMeter,
                     EnableAutoSizing = uiWindow.EnableAutoSizing,
                     EnableBusinessRulePreview = uiWindow.EnableBusinessRulePreview,
+                    EnableMultipleFcus = uiWindow.EnableMultipleFcus,
                     SelectedDoorIds = new Dictionary<int, ElementId>(),
                     EnableReturnPipe = uiWindow.EnableReturnPipe,
                     EnableCondensate = uiWindow.EnableCondensate,

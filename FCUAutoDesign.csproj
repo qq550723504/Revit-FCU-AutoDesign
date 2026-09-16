@@ -47,6 +47,7 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
     <Reference Include="WindowsBase" />
@@ -98,6 +99,7 @@
     <Compile Include="Services\FcuBatchService.cs" />
     <Compile Include="Services\RoomRuleSnapshotReader.cs" />
     <Compile Include="Services\FcuBusinessPreviewService.cs" />
+    <Compile Include="Services\DesignRecordRepository.cs" />
     <Compile Include="Models\RoomExecutionResult.cs" />
     <Compile Include="Models\DesignRecordContract.cs" />
     <Compile Include="Domain\EquipmentSelection\EquipmentSelectionModels.cs" />

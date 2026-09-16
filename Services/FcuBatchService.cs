@@ -65,8 +65,11 @@ namespace FCUAutoDesign
                 catch (Exception ex)
                 {
                     results[i].Error = ex.Message;
-                    if (options.EnableCondensate)
-                        stopped = "前一房间执行失败，受限批量已停止后续房间。";
+                    // FcuDesignService owns a per-room transaction group and the shared
+                    // MainPipeRun fork is registered only after success. A normal room
+                    // failure therefore rolls back that room without invalidating later
+                    // rooms. Only regeneration failure, cancellation, or an explicitly
+                    // returned incomplete condensate result stops the batch.
                 }
                 finally { roomClock.Stop(); results[i].Elapsed = roomClock.Elapsed; }
             }

@@ -27,6 +27,8 @@ namespace FCUAutoDesign
 
     internal sealed class AutomaticScopeDiscoveryService
     {
+        private readonly FcuPlacementService placement = new FcuPlacementService();
+
         public RoomDiscoveryResult DiscoverRooms(Document doc, View view, IEnumerable<string> nameKeywords)
         {
             RoomDiscoveryResult result = new RoomDiscoveryResult();
@@ -35,12 +37,18 @@ namespace FCUAutoDesign
                 result.Rejections.Add("当前视图不是具有标高的平面视图，请改用手动选择。");
                 return result;
             }
+            DesignRecordRepository repository = new DesignRecordRepository(doc);
             foreach (Room room in new FilteredElementCollector(doc, view.Id)
                 .OfCategory(BuiltInCategory.OST_Rooms).WhereElementIsNotElementType().Cast<Room>()
                 .OrderBy(x => x.Number, StringComparer.Ordinal).ThenBy(x => x.Id.IntegerValue))
             {
                 string label = (room.Number ?? room.Id.IntegerValue.ToString()) + " " + (room.Name ?? string.Empty);
-                if (room.LevelId != view.GenLevel.Id) result.Rejections.Add(label + "：不在当前视图标高。");
+                DesignRecordReadResult existing = repository.LoadByRoomUniqueId(room.UniqueId);
+                if (existing.Status == DesignOperationStatus.Succeeded)
+                    result.Rejections.Add(label + "：已有 FCU 设计记录，自动新建批次已跳过；可手动选择进入重算。");
+                else if (existing.Status != DesignOperationStatus.NotFound)
+                    result.Rejections.Add(label + "：设计记录状态异常，未自动处理：" + existing.Message);
+                else if (room.LevelId != view.GenLevel.Id) result.Rejections.Add(label + "：不在当前视图标高。");
                 else if (room.Location == null || room.Area <= 0) result.Rejections.Add(label + "：未放置或未形成有效封闭面积。");
                 else if (!RoomNameKeywordPolicy.Matches(room.Name, nameKeywords))
                     result.Rejections.Add(label + "：名称不匹配自动设计关键词。");
@@ -71,15 +79,15 @@ namespace FCUAutoDesign
         }
 
         public PipeDiscoveryResult DiscoverPipe(Document doc, View view, IList<Room> rooms,
-            MEPSystemClassification classification, string label)
+            FcuDesignOptions options, MEPSystemClassification classification, string label)
         {
             PipeDiscoveryResult result = new PipeDiscoveryResult { Label = label };
             if (view == null || view.IsTemplate || view.GenLevel == null
                 || rooms == null || rooms.Count == 0) return result;
             ElementId levelId = rooms[0].LevelId;
-            List<Point3D> approaches = rooms.Select(RoomCenter).Where(x => x.HasValue)
-                .Select(x => x.Value).ToList();
-            if (approaches.Count != rooms.Count) return result;
+            List<Point3D> approaches = rooms.SelectMany(room => placement.PlanPoints(doc, room, options))
+                .Where(x => x != null).Select(Point).ToList();
+            if (approaches.Count == 0) return result;
 
             List<Tuple<Pipe, Line>> candidates = new FilteredElementCollector(doc, view.Id)
                 .OfClass(typeof(Pipe)).Cast<Pipe>()
@@ -94,8 +102,13 @@ namespace FCUAutoDesign
                 Start = Point(x.Item2.GetEndPoint(0)),
                 End = Point(x.Item2.GetEndPoint(1))
             }).ToList();
+            FamilySymbol symbol = doc.GetElement(new ElementId(options.SelectedFcuTypeId)) as FamilySymbol;
+            BoundingBoxXYZ familyBounds = symbol?.get_BoundingBox(null);
+            double familyPlanExtent = familyBounds == null ? 0 : Math.Sqrt(
+                Math.Pow(familyBounds.Max.X - familyBounds.Min.X, 2)
+                + Math.Pow(familyBounds.Max.Y - familyBounds.Min.Y, 2));
             LinearMainCandidateResult selected = LinearMainCandidateSelector.Select(geometry, approaches,
-                Math.Max(doc.Application.ShortCurveTolerance, RevitUnits.MM_TO_FEET));
+                Math.Max(Math.Max(doc.Application.ShortCurveTolerance, RevitUnits.MM_TO_FEET), familyPlanExtent));
             foreach (string id in selected.EligibleCandidateIds)
                 result.EligiblePipes.Add(candidates.Single(x => x.Item1.UniqueId == id).Item1);
             result.UniquePipe = string.IsNullOrEmpty(selected.UniqueCandidateId)
@@ -157,13 +170,6 @@ namespace FCUAutoDesign
         {
             ElementId id = pipe.get_Parameter(BuiltInParameter.RBS_PIPING_SYSTEM_TYPE_PARAM)?.AsElementId();
             return (doc.GetElement(id) as PipingSystemType)?.SystemClassification;
-        }
-        private static Point3D? RoomCenter(Room room)
-        {
-            BoundingBoxXYZ box = room.get_BoundingBox(null);
-            if (box == null) return null;
-            XYZ center = (box.Min + box.Max) * 0.5;
-            return Point(center);
         }
         private static Point3D Point(XYZ p) { return new Point3D(p.X, p.Y, p.Z); }
     }

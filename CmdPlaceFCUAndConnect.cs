@@ -151,13 +151,13 @@ namespace FCUAutoDesign
                 bool useAutomaticPipes = false;
                 if (options.EnableAutomaticScopeDiscovery)
                 {
-                    supplyDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms,
+                    supplyDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
                         MEPSystemClassification.SupplyHydronic, "供水主管");
                     if (options.EnableReturnPipe)
-                        returnDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms,
+                        returnDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
                             MEPSystemClassification.ReturnHydronic, "回水主管");
                     if (options.EnableCondensate)
-                        drainDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms,
+                        drainDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
                             MEPSystemClassification.Sanitary, "冷凝水主管");
                     bool? useDiscoveredPipes = discoveryService.ConfirmPipes(
                         new[] { supplyDiscovery, returnDiscovery, drainDiscovery }.Where(x => x != null));

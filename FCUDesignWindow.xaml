@@ -31,10 +31,10 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="100"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="进门过道内缩 (mm):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
-                        <TextBox x:Name="TxtDoorOffset" Grid.Column="1" Text="800" Background="#0f172a" Foreground="#38bdf8" BorderBrush="#475569" Padding="4"/>
+                        <TextBlock Text="距门侧墙内侧距离 (mm):" ToolTip="FCU 中心到门所在墙室内侧的距离；默认 500 mm。沿墙方向取房间中部。" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
+                        <TextBox x:Name="TxtDoorOffset" Grid.Column="1" Text="500" Background="#0f172a" Foreground="#38bdf8" BorderBrush="#475569" Padding="4"/>
                     </Grid>
-                    <CheckBox x:Name="ChkCenterPlacement" Content="优先布置在房间几何中心（门侧仅用于确定朝向）" IsChecked="True" Foreground="#38bdf8" Margin="0,0,0,10" FontSize="11"/>
+                    <CheckBox x:Name="ChkCenterPlacement" Content="改用房间几何中心布置（默认关闭）" IsChecked="False" Foreground="#38bdf8" Margin="0,0,0,10" FontSize="11"/>
 
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>

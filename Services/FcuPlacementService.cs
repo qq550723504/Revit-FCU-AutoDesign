@@ -61,13 +61,13 @@ namespace FCUAutoDesign
                     }
                 }
 
-                XYZ roomCenter = options.CenterPlacement
+                XYZ targetPoint = options.CenterPlacement
                     ? RoomRuleSnapshotReader.GetRoomCenter(doc, room, wallDirection)
-                    : null;
-                if (roomCenter != null)
+                    : RoomRuleSnapshotReader.GetDoorWallOffsetCenter(doc, room, doorWall, options.DoorOffsetMm);
+                if (targetPoint != null)
                 {
-                    candidatePt = roomCenter;
-                    // 中心布置不改变门侧朝向，只改变设备落点。
+                    candidatePt = targetPoint;
+                    // 位置规则不改变门侧朝向，只改变设备落点。
                     testCheckPt = new XYZ(candidatePt.X, candidatePt.Y, baseLevelElev + 1.0);
                 }
                 placePoint = new XYZ(candidatePt.X, candidatePt.Y, fcuAbsoluteZ);

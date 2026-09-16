@@ -174,6 +174,36 @@ namespace FCUAutoDesign
             return room.IsPointInRoom(test) ? center : null;
         }
 
+        internal static XYZ GetDoorWallOffsetCenter(Document doc, Room room, Wall wall, double offsetMm)
+        {
+            if (doc == null || room == null || wall == null || offsetMm <= 0
+                || double.IsNaN(offsetMm) || double.IsInfinity(offsetMm)) return null;
+            Line wallLine = (wall.Location as LocationCurve)?.Curve as Line;
+            if (wallLine == null) return null;
+            XYZ axis = new XYZ(wallLine.Direction.X, wallLine.Direction.Y, 0).Normalize();
+            XYZ perpendicular = XYZ.BasisZ.CrossProduct(axis).Normalize();
+            IList<IList<BoundarySegment>> loops = room.GetBoundarySegments(new SpatialElementBoundaryOptions());
+            IList<BoundarySegment> outer = loops?.OrderByDescending(x => x.Sum(s => s.GetCurve().Length)).FirstOrDefault();
+            if (outer == null || outer.Count == 0) return null;
+            List<XYZ> points = outer.SelectMany(x => new[] { x.GetCurve().GetEndPoint(0), x.GetCurve().GetEndPoint(1) }).ToList();
+            if (points.Count == 0) return null;
+            double minA = points.Min(x => x.DotProduct(axis));
+            double maxA = points.Max(x => x.DotProduct(axis));
+            double along = (minA + maxA) * 0.5;
+            XYZ wallOrigin = wallLine.GetEndPoint(0);
+            XYZ wallMid = wallOrigin + axis * (along - wallOrigin.DotProduct(axis));
+            XYZ roomCenter = GetRoomCenter(doc, room, axis);
+            if (roomCenter == null) return null;
+            XYZ inward = roomCenter - wallMid;
+            inward = new XYZ(inward.X, inward.Y, 0);
+            if (inward.GetLength() <= ToleranceFeet) return null;
+            inward = inward.Normalize();
+            double wallHalfWidth = Math.Max(0, wall.Width * 0.5);
+            XYZ candidate = wallMid + inward * (wallHalfWidth + offsetMm * MM_TO_FEET);
+            XYZ test = new XYZ(candidate.X, candidate.Y, room.Level.Elevation + 1.0);
+            return room.IsPointInRoom(test) ? candidate : null;
+        }
+
         internal static bool BelongsToRoom(FamilyInstance door, Room room)
         {
             return door != null && room != null

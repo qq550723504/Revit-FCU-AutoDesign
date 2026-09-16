@@ -6,8 +6,8 @@ namespace FCUAutoDesign
 {
     public partial class FCUDesignWindow : Window
     {
-        public double DoorOffsetMm { get; private set; } = 800;
-        public bool CenterPlacement { get; private set; } = true;
+        public double DoorOffsetMm { get; private set; } = 500;
+        public bool CenterPlacement { get; private set; } = false;
         public double FcuElevationMm { get; private set; } = 2600;
         public double ValveClearanceMm { get; private set; } = 400;
         public double? MinimumStraightLengthMm { get; private set; }

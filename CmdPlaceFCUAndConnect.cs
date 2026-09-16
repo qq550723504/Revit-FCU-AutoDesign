@@ -127,6 +127,39 @@ namespace FCUAutoDesign
                     }
                 }
 
+                PipeDiscoveryResult supplyDiscovery = null, returnDiscovery = null, drainDiscovery = null;
+                bool useAutomaticPipes = false;
+                if (options.EnableAutomaticScopeDiscovery)
+                {
+                    supplyDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
+                        MEPSystemClassification.SupplyHydronic, "供水主管");
+                    if (options.EnableReturnPipe)
+                        returnDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
+                            MEPSystemClassification.ReturnHydronic, "回水主管");
+                    if (options.EnableCondensate)
+                        drainDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
+                            MEPSystemClassification.Sanitary, "冷凝水主管");
+                    List<PipeDiscoveryResult> pipeDiscoveries =
+                        new[] { supplyDiscovery, returnDiscovery, drainDiscovery }.Where(x => x != null).ToList();
+                    bool? useDiscoveredPipes = discoveryService.ConfirmPipes(pipeDiscoveries, rooms);
+                    if (!useDiscoveredPipes.HasValue) return Result.Cancelled;
+                    useAutomaticPipes = useDiscoveredPipes.Value;
+                    if (useAutomaticPipes)
+                    {
+                        List<PipeDiscoveryResult> resolved = pipeDiscoveries.Where(x => x.UniquePipe != null).ToList();
+                        if (resolved.Count > 0)
+                        {
+                            rooms = rooms.Where(room => resolved.All(x =>
+                                x.CoveredRoomIds.Contains(room.Id.IntegerValue))).ToList();
+                            if (rooms.Count == 0)
+                            {
+                                TaskDialog.Show("自动范围为空", "供水、回水和冷凝水主管没有共同覆盖的目标房间。");
+                                return Result.Cancelled;
+                            }
+                        }
+                    }
+                }
+
                 // 已登记房间先进入三方差异预览。只有纯计算字段变化可在明确确认后
                 // 更新设计记录；任何模型几何、型号、数量或管线变化仍保持只读。
                 ReconciliationPreviewOutcome reconciliation =
@@ -145,24 +178,6 @@ namespace FCUAutoDesign
                         : selectedSymbol.FamilyName + " : " + selectedSymbol.Name;
                     if (!new FcuBusinessPreviewService().Confirm(doc, rooms, options, selectedTypeName))
                         return Result.Cancelled;
-                }
-
-                PipeDiscoveryResult supplyDiscovery = null, returnDiscovery = null, drainDiscovery = null;
-                bool useAutomaticPipes = false;
-                if (options.EnableAutomaticScopeDiscovery)
-                {
-                    supplyDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
-                        MEPSystemClassification.SupplyHydronic, "供水主管");
-                    if (options.EnableReturnPipe)
-                        returnDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
-                            MEPSystemClassification.ReturnHydronic, "回水主管");
-                    if (options.EnableCondensate)
-                        drainDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
-                            MEPSystemClassification.Sanitary, "冷凝水主管");
-                    bool? useDiscoveredPipes = discoveryService.ConfirmPipes(
-                        new[] { supplyDiscovery, returnDiscovery, drainDiscovery }.Where(x => x != null));
-                    if (!useDiscoveredPipes.HasValue) return Result.Cancelled;
-                    useAutomaticPipes = useDiscoveredPipes.Value;
                 }
 
                 Pipe supplyMainPipe = useAutomaticPipes ? supplyDiscovery?.UniquePipe : null;

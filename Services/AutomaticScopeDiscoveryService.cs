@@ -22,6 +22,8 @@ namespace FCUAutoDesign
     {
         public Pipe UniquePipe { get; set; }
         public IList<Pipe> EligiblePipes { get; } = new List<Pipe>();
+        public ISet<int> CoveredRoomIds { get; } = new HashSet<int>();
+        public int TotalRoomCount { get; set; }
         public string Label { get; set; }
     }
 
@@ -85,9 +87,12 @@ namespace FCUAutoDesign
             if (view == null || view.IsTemplate || view.GenLevel == null
                 || rooms == null || rooms.Count == 0) return result;
             ElementId levelId = rooms[0].LevelId;
-            List<Point3D> approaches = rooms.SelectMany(room => placement.PlanPoints(doc, room, options))
-                .Where(x => x != null).Select(Point).ToList();
-            if (approaches.Count == 0) return result;
+            result.TotalRoomCount = rooms.Count;
+            Dictionary<int, IList<Point3D>> roomApproaches = rooms.ToDictionary(
+                room => room.Id.IntegerValue,
+                room => (IList<Point3D>)placement.PlanPoints(doc, room, options)
+                    .Where(x => x != null).Select(Point).ToList());
+            if (roomApproaches.Values.All(x => x.Count == 0)) return result;
 
             List<Tuple<Pipe, Line>> candidates = new FilteredElementCollector(doc, view.Id)
                 .OfClass(typeof(Pipe)).Cast<Pipe>()
@@ -124,10 +129,19 @@ namespace FCUAutoDesign
                 }).ToList();
                 runs.Add(key, Tuple.Create(representative, segments));
             }
-            foreach (Tuple<Pipe, IList<LinearMainCandidate>> run in runs.Values)
-                if (LinearMainCandidateSelector.CoversAll(run.Item2, approaches, endpointTolerance))
-                    result.EligiblePipes.Add(run.Item1);
-            result.UniquePipe = result.EligiblePipes.Count == 1 ? result.EligiblePipes[0] : null;
+            List<Tuple<Pipe, IList<int>>> scored = runs.Values.Select(run => Tuple.Create(run.Item1,
+                (IList<int>)roomApproaches.Where(room => room.Value.Count > 0
+                    && LinearMainCandidateSelector.CoversAll(run.Item2, room.Value, endpointTolerance))
+                    .Select(room => room.Key).ToList())).ToList();
+            int bestCoverage = scored.Count == 0 ? 0 : scored.Max(x => x.Item2.Count);
+            foreach (Tuple<Pipe, IList<int>> run in scored.Where(x => x.Item2.Count == bestCoverage && bestCoverage > 0))
+                result.EligiblePipes.Add(run.Item1);
+            if (result.EligiblePipes.Count == 1)
+            {
+                result.UniquePipe = result.EligiblePipes[0];
+                foreach (int roomId in scored.Single(x => x.Item1.Id == result.UniquePipe.Id).Item2)
+                    result.CoveredRoomIds.Add(roomId);
+            }
             return result;
         }
 
@@ -156,14 +170,15 @@ namespace FCUAutoDesign
             return choice == TaskDialogResult.Cancel ? (bool?)null : choice == TaskDialogResult.Yes;
         }
 
-        public bool? ConfirmPipes(IEnumerable<PipeDiscoveryResult> discoveries)
+        public bool? ConfirmPipes(IEnumerable<PipeDiscoveryResult> discoveries, IEnumerable<Room> rooms)
         {
             List<PipeDiscoveryResult> values = discoveries.ToList();
             StringBuilder content = new StringBuilder();
             foreach (PipeDiscoveryResult value in values)
                 content.AppendLine(value.Label + "：" + (value.UniquePipe == null
-                    ? value.EligiblePipes.Count == 0 ? "无覆盖全部房间的候选，将手动选择" : "存在多个候选，将手动选择"
-                    : "元素 ID " + value.UniquePipe.Id.IntegerValue + "（唯一候选）"));
+                    ? value.EligiblePipes.Count == 0 ? "没有可用候选，将手动选择" : "最佳覆盖数并列，将手动选择"
+                    : "元素 ID " + value.UniquePipe.Id.IntegerValue + "；覆盖 "
+                        + value.CoveredRoomIds.Count + "/" + value.TotalRoomCount + " 个房间"));
             if (!values.Any(x => x.UniquePipe != null))
             {
                 TaskDialog.Show("未唯一确定主管", content + "将按原流程手动拾取主管。");
@@ -173,12 +188,22 @@ namespace FCUAutoDesign
             {
                 MainInstruction = "已发现唯一主管候选，是否采用？",
                 MainContent = content.ToString(),
-                FooterText = "未唯一确定的回路仍会要求手动拾取。",
+                ExpandedContent = ExcludedRoomDetails(values, rooms),
+                FooterText = "采用自动主管后，只处理所有已确定主管共同覆盖的房间；其他房间不自动生成。",
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No | TaskDialogCommonButtons.Cancel,
                 DefaultButton = TaskDialogResult.No
             };
             TaskDialogResult choice = dialog.Show();
             return choice == TaskDialogResult.Cancel ? (bool?)null : choice == TaskDialogResult.Yes;
+        }
+
+        private static string ExcludedRoomDetails(IList<PipeDiscoveryResult> discoveries, IEnumerable<Room> rooms)
+        {
+            List<PipeDiscoveryResult> resolved = discoveries.Where(x => x.UniquePipe != null).ToList();
+            if (resolved.Count == 0) return string.Empty;
+            return string.Join(Environment.NewLine, rooms.Where(room =>
+                resolved.Any(x => !x.CoveredRoomIds.Contains(room.Id.IntegerValue)))
+                .Select(room => "排除：" + room.Number + " " + room.Name + "；现有横向主管未覆盖。"));
         }
 
         private static MEPSystemClassification? Classification(Document doc, Pipe pipe)

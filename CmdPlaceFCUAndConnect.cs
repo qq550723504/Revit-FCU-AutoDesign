@@ -103,6 +103,10 @@ namespace FCUAutoDesign
                     }
                 }
 
+                // 已登记房间进入只读三方差异预览。本轮不继续选择主管或修改模型。
+                if (new DesignReconciliationPreviewService().ShowIfExisting(doc, rooms, options))
+                    return Result.Cancelled;
+
                 if (options.EnableBusinessRulePreview)
                 {
                     FamilySymbol selectedSymbol = doc.GetElement(

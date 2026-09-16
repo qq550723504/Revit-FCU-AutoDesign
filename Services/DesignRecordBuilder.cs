@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using static FCUAutoDesign.RevitUnits;
@@ -86,7 +84,7 @@ namespace FCUAutoDesign
                     DesignPipeRole.CondensateBranch, room.UniqueId, logicalDeviceId, unit.CondensateNetworkId);
             }
             foreach (DesignPipeRecord pipe in pipes.Values) snapshot.Pipes.Add(pipe);
-            snapshot.Fingerprint = ComputeFingerprint(snapshot);
+            snapshot.Fingerprint = DesignSnapshotFingerprint.Compute(snapshot);
             return new DesignRecord
             {
                 Identity = new DesignIdentity
@@ -156,21 +154,5 @@ namespace FCUAutoDesign
                     "{0:R},{1:R},{2:R}", direction.X, direction.Y, direction.Z);
         }
 
-        private static string ComputeFingerprint(DesignSnapshot snapshot)
-        {
-            IEnumerable<string> roomParts = snapshot.Rooms.OrderBy(x => x.RoomUniqueId, StringComparer.Ordinal)
-                .Select(x => string.Join("|", x.RoomUniqueId, x.Length?.Value.ToString("R"),
-                    x.Height?.Value.ToString("R"), x.DesignCoolingLoad?.Value.ToString("R"), x.UnitCount));
-            IEnumerable<string> deviceParts = snapshot.Devices.OrderBy(x => x.LogicalDeviceId, StringComparer.Ordinal)
-                .Select(x => string.Join("|", x.LogicalDeviceId, x.ElementUniqueId,
-                    x.Position?.X.ToString("R"), x.Position?.Y.ToString("R"), x.Position?.Z.ToString("R"), x.Orientation));
-            IEnumerable<string> pipeParts = snapshot.Pipes.OrderBy(x => x.LogicalPipeId, StringComparer.Ordinal)
-                .Select(x => string.Join("|", x.LogicalPipeId, x.ElementUniqueId, (int)x.Role,
-                    (int)x.Ownership, x.SharedNetworkId));
-            string canonical = string.Join("\n", roomParts.Concat(deviceParts).Concat(pipeParts));
-            using (SHA256 sha = SHA256.Create())
-                return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(canonical)))
-                    .Replace("-", string.Empty).ToLowerInvariant();
-        }
     }
 }

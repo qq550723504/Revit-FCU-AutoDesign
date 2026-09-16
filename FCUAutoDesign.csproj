@@ -102,6 +102,8 @@
     <Compile Include="Services\DesignRecordRepository.cs" />
     <Compile Include="Services\DesignRecordPayloadCodec.cs" />
     <Compile Include="Services\DesignRecordBuilder.cs" />
+    <Compile Include="Services\DesignSnapshotFingerprint.cs" />
+    <Compile Include="Services\DesignReconciliationPreviewService.cs" />
     <Compile Include="Models\RoomExecutionResult.cs" />
     <Compile Include="Models\DesignRecordContract.cs" />
     <Compile Include="Domain\EquipmentSelection\EquipmentSelectionModels.cs" />

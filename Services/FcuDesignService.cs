@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.DB.Plumbing;
@@ -18,11 +19,22 @@ namespace FCUAutoDesign
         public FcuDesignResult Execute(Document doc, Room room, Pipe supplyMainPipe,
             Pipe returnMainPipe, Pipe condensateMainPipe, FcuDesignOptions options, RoomBatchContext batch = null)
         {
+            DesignRecordRepository repository = new DesignRecordRepository(doc);
+            DesignRecordReadResult existing = repository.LoadByRoomUniqueId(room.UniqueId);
+            if (existing.Status == DesignOperationStatus.Succeeded)
+                throw new InvalidOperationException("该房间已有插件设计记录。当前版本尚未启用安全重算，为避免重复放置已停止执行。"
+                    + Environment.NewLine + "DesignId: " + existing.Record.Identity.DesignId
+                    + Environment.NewLine + "请等待 FCU-205 重算接入，或在模型副本中使用未登记房间测试。");
+            if (existing.Status != DesignOperationStatus.NotFound)
+                throw new InvalidOperationException("读取房间设计记录失败，未修改模型：" + existing.Message);
+            string designId = Guid.NewGuid().ToString("N");
             if (!options.EnableMultipleFcus)
-                return ExecuteSingle(doc, room, supplyMainPipe, returnMainPipe, condensateMainPipe, options, batch);
+                return ExecuteSingle(doc, room, supplyMainPipe, returnMainPipe, condensateMainPipe,
+                    options, batch, null, true, designId);
             var points = placement.PlanPoints(doc, room, options);
             if (points.Count == 1)
-                return ExecuteSingle(doc, room, supplyMainPipe, returnMainPipe, condensateMainPipe, options, batch, points[0]);
+                return ExecuteSingle(doc, room, supplyMainPipe, returnMainPipe, condensateMainPipe,
+                    options, batch, points[0], true, designId);
             RoomBatchContext working = (batch ?? new RoomBatchContext(supplyMainPipe, returnMainPipe, condensateMainPipe)).Fork();
             var result = new FcuDesignResult { RoomAreaSqm = room.Area * SQFT_TO_SQM };
             using (TransactionGroup roomGroup = new TransactionGroup(doc, "同房间多台 FCU"))
@@ -31,7 +43,8 @@ namespace FCUAutoDesign
                 for (int i = 0; i < points.Count; i++)
                 {
                     FcuDesignResult unit = ExecuteSingle(doc, room, working.Supply.AnySegment(doc),
-                        working.Return?.AnySegment(doc), working.Condensate?.AnySegment(doc), options, working, points[i]);
+                        working.Return?.AnySegment(doc), working.Condensate?.AnySegment(doc), options,
+                        working, points[i], false, designId);
                     ExecutionOutcome o = unit.Outcome;
                     bool connected = o.SupplyBranchCreated && (!options.BreakCurveAndTee || o.SupplyTeeConnected)
                         && (!options.EnableReturnPipe || (o.ReturnBranchCreated && (!options.BreakCurveAndTee || o.ReturnTeeConnected)))
@@ -56,17 +69,19 @@ namespace FCUAutoDesign
                     ConnectionInstallationVerifier.Verify(doc, unit.ReturnConnection);
                     ConnectionInstallationVerifier.Verify(doc, unit.DrainConnection);
                 }
+                result.ActualDn = result.UnitResults[0].ActualDn;
+                result.CoolingLoadKw = result.UnitResults[0].CoolingLoadKw;
+                PersistRecord(doc, room, result, options, designId);
                 if (roomGroup.Assimilate() != TransactionStatus.Committed)
                     throw new InvalidOperationException("多台 FCU 房间事务组未提交。");
             }
-            result.ActualDn = result.UnitResults[0].ActualDn;
-            result.CoolingLoadKw = result.UnitResults[0].CoolingLoadKw;
             return result;
         }
 
         private FcuDesignResult ExecuteSingle(Document doc, Room room, Pipe supplyMainPipe,
             Pipe returnMainPipe, Pipe condensateMainPipe, FcuDesignOptions options,
-            RoomBatchContext batch, XYZ plannedPoint = null)
+            RoomBatchContext batch, XYZ plannedPoint = null, bool persistRecord = false,
+            string designId = null)
         {
             double roomAreaSqm = room.Area * SQFT_TO_SQM;
             double coolingLoadKw = roomAreaSqm * 0.160; // 160 W/m² 指标估算
@@ -98,6 +113,7 @@ namespace FCUAutoDesign
             TeeConnectionResult supplyResult = null;
             TeeConnectionResult returnResult = null;
             XYZ expectedOutletDirection = null;
+            FcuDesignResult designResult = null;
 
             using (TransactionGroup group = new TransactionGroup(doc, "FCU PoC 验证"))
             {
@@ -220,17 +236,64 @@ namespace FCUAutoDesign
                 ConnectionInstallationVerifier.Verify(doc, returnResult);
                 ConnectionInstallationVerifier.Verify(doc, drainResult?.Connected == true ? drainResult.Connection : null);
                 batch?.VerifyPrevious(doc, supplyResult, returnResult, drainResult?.Connected == true ? drainResult.Connection : null);
+                designResult = new FcuDesignResult
+                {
+                    Outcome = outcome, ExpectedOutletDirection = expectedOutletDirection, RoomAreaSqm = roomAreaSqm,
+                    CoolingLoadKw = coolingLoadKw, ActualDn = actualDn,
+                    SupplyConnection = supplyResult, ReturnConnection = returnResult,
+                    DrainConnection = drainResult?.Connected == true ? drainResult.Connection : null,
+                    SupplyNetworkId = batch?.Supply.NetworkId ?? (supplyMainPipe == null ? null : "main:" + supplyMainPipe.UniqueId),
+                    ReturnNetworkId = batch?.Return?.NetworkId ?? (returnMainPipe == null ? null : "main:" + returnMainPipe.UniqueId),
+                    CondensateNetworkId = batch?.Condensate?.NetworkId ?? (condensateMainPipe == null ? null : "main:" + condensateMainPipe.UniqueId)
+                };
+                if (persistRecord)
+                {
+                    RequireComplete(designResult, options);
+                    PersistRecord(doc, room, designResult, options, designId);
+                }
                 if (group.Assimilate() != TransactionStatus.Committed)
                     throw new InvalidOperationException("PoC 事务组未成功提交。");
             }
 
-            return new FcuDesignResult
+            return designResult;
+        }
+
+        private static void PersistRecord(Document doc, Room room, FcuDesignResult result,
+            FcuDesignOptions options, string designId)
+        {
+            DesignRecord record = new DesignRecordBuilder().Build(doc, room, result, options, designId);
+            DesignRecordRepository repository = new DesignRecordRepository(doc);
+            using (Transaction recordTransaction = new Transaction(doc, "保存 FCU 设计记录"))
             {
-                Outcome = outcome, ExpectedOutletDirection = expectedOutletDirection, RoomAreaSqm = roomAreaSqm,
-                CoolingLoadKw = coolingLoadKw, ActualDn = actualDn,
-                SupplyConnection = supplyResult, ReturnConnection = returnResult,
-                DrainConnection = drainResult?.Connected == true ? drainResult.Connection : null
-            };
+                recordTransaction.Start();
+                DesignOperationResult saved = repository.Save(new DesignWriteRequest { Record = record });
+                if (saved.Status != DesignOperationStatus.Succeeded)
+                    throw new InvalidOperationException("设计记录保存失败：" + saved.Message);
+                if (recordTransaction.Commit() != TransactionStatus.Committed)
+                    throw new InvalidOperationException("设计记录事务未成功提交。");
+            }
+            DesignRecordReadResult reloaded = repository.Load(new DesignRecordKey
+            {
+                DesignId = record.Identity.DesignId,
+                HostDocumentId = record.Identity.HostDocumentId
+            });
+            if (reloaded.Status != DesignOperationStatus.Succeeded
+                || reloaded.Record?.LastSuccessfulSnapshot?.Devices.Count != result.Devices.Count())
+                throw new InvalidOperationException("设计记录提交后复核失败，已回滚本房间模型与记录。");
+        }
+
+        private static void RequireComplete(FcuDesignResult design, FcuDesignOptions options)
+        {
+            foreach (FcuDesignResult unit in design.Devices)
+            {
+                ExecutionOutcome o = unit.Outcome;
+                bool complete = o.SupplyBranchCreated && (!options.BreakCurveAndTee || o.SupplyTeeConnected)
+                    && (!options.EnableReturnPipe || (o.ReturnBranchCreated && (!options.BreakCurveAndTee || o.ReturnTeeConnected)))
+                    && (!options.EnableCondensate || o.CondensateConnected);
+                if (!complete)
+                    throw new InvalidOperationException("连接未全部完成，不能建立成功设计基线；已回滚本房间模型与记录。"
+                        + Environment.NewLine + string.Join(Environment.NewLine, o.Warnings));
+            }
         }
     }
 }

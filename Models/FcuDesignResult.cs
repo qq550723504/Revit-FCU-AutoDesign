@@ -15,5 +15,8 @@ namespace FCUAutoDesign
         public TeeConnectionResult SupplyConnection { get; set; }
         public TeeConnectionResult ReturnConnection { get; set; }
         public TeeConnectionResult DrainConnection { get; set; }
+        public string SupplyNetworkId { get; set; }
+        public string ReturnNetworkId { get; set; }
+        public string CondensateNetworkId { get; set; }
     }
 }

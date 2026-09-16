@@ -11,9 +11,18 @@ namespace FCUAutoDesign
     internal class MainPipeRun
     {
         private readonly HashSet<ElementId> segments = new HashSet<ElementId>();
-        public MainPipeRun(Pipe initial) { segments.Add(initial.Id); }
-        private MainPipeRun(IEnumerable<ElementId> ids) { segments.UnionWith(ids); }
-        public MainPipeRun Fork() { return new MainPipeRun(segments); }
+        public string NetworkId { get; }
+        public MainPipeRun(Pipe initial)
+        {
+            if (initial == null) throw new ArgumentNullException("initial");
+            segments.Add(initial.Id);
+            NetworkId = "main:" + initial.UniqueId;
+        }
+        private MainPipeRun(IEnumerable<ElementId> ids, string networkId)
+        {
+            segments.UnionWith(ids); NetworkId = networkId;
+        }
+        public MainPipeRun Fork() { return new MainPipeRun(segments, NetworkId); }
         public Pipe AnySegment(Document doc)
         {
             return segments.Select(id => doc.GetElement(id) as Pipe).FirstOrDefault(p => p != null)

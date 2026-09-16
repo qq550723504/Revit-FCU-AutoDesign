@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web.Script.Serialization;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.ExtensibleStorage;
 
@@ -23,8 +22,9 @@ namespace FCUAutoDesign
         private const string StatusField = "Status";
         private const string PayloadField = "PayloadJson";
         private const string UpdatedAtField = "UpdatedAtUtc";
+        private const string RoomUniqueIdsField = "RoomUniqueIds";
         private readonly Document document;
-        private readonly JavaScriptSerializer serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+        private readonly DesignRecordPayloadCodec codec = new DesignRecordPayloadCodec();
 
         public DesignRecordRepository(Document document)
         {
@@ -41,7 +41,7 @@ namespace FCUAutoDesign
             Entity entity = storage.GetEntity(schema);
             try
             {
-                DesignRecord record = serializer.Deserialize<DesignRecord>(entity.Get<string>(schema.GetField(PayloadField)));
+                DesignRecord record = codec.Decode(entity.Get<string>(schema.GetField(PayloadField)));
                 if (record == null || record.Identity == null || !SameKey(record.Identity, key))
                     return Fail(result, DesignOperationStatus.Failed, DesignErrorCode.SnapshotInvalid, "设计记录身份与索引不一致。");
                 result.Status = DesignOperationStatus.Succeeded;
@@ -55,6 +55,35 @@ namespace FCUAutoDesign
                 return Fail(result, DesignOperationStatus.Failed, DesignErrorCode.SnapshotInvalid,
                     "设计记录内容无法解析：" + ex.Message);
             }
+        }
+
+        public DesignRecordReadResult LoadByRoomUniqueId(string roomUniqueId)
+        {
+            DesignRecordReadResult result = new DesignRecordReadResult();
+            if (string.IsNullOrWhiteSpace(roomUniqueId))
+                return Fail(result, DesignOperationStatus.Invalid, DesignErrorCode.InvalidIdentity, "房间 UniqueId 不能为空。");
+            Schema schema = GetSchema();
+            Field roomIds = schema.GetField(RoomUniqueIdsField);
+            List<DataStorage> matches = new FilteredElementCollector(document).OfClass(typeof(DataStorage))
+                .Cast<DataStorage>().Where(x =>
+                {
+                    Entity entity = x.GetEntity(schema);
+                    if (!entity.IsValid()) return false;
+                    string indexed = entity.Get<string>(roomIds) ?? string.Empty;
+                    return indexed.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Contains(roomUniqueId, StringComparer.Ordinal);
+                }).ToList();
+            if (matches.Count == 0)
+                return Fail(result, DesignOperationStatus.NotFound, DesignErrorCode.DesignNotFound, "房间没有插件设计记录。");
+            if (matches.Count > 1)
+                return Fail(result, DesignOperationStatus.Conflict, DesignErrorCode.DuplicateRoom,
+                    "同一房间关联了多个设计记录，必须先解决重复身份。");
+            Entity match = matches[0].GetEntity(schema);
+            return Load(new DesignRecordKey
+            {
+                DesignId = match.Get<string>(schema.GetField(DesignIdField)),
+                HostDocumentId = match.Get<string>(schema.GetField(HostDocumentIdField))
+            });
         }
 
         public DesignOperationResult Save(DesignWriteRequest request)
@@ -92,8 +121,12 @@ namespace FCUAutoDesign
             entity.Set(schema.GetField(SchemaVersionField), request.Record.Version.SchemaVersion);
             entity.Set(schema.GetField(RevisionField), request.Record.Version.Revision);
             entity.Set(schema.GetField(StatusField), (int)request.Record.Status);
-            entity.Set(schema.GetField(PayloadField), serializer.Serialize(request.Record));
+            entity.Set(schema.GetField(PayloadField), codec.Encode(request.Record));
             entity.Set(schema.GetField(UpdatedAtField), DateTime.UtcNow.ToString("o"));
+            IEnumerable<string> roomIds = request.Record.LastSuccessfulSnapshot?.Rooms
+                .Select(x => x.RoomUniqueId).Where(x => !string.IsNullOrWhiteSpace(x))
+                ?? Enumerable.Empty<string>();
+            entity.Set(schema.GetField(RoomUniqueIdsField), string.Join("\n", roomIds.Distinct(StringComparer.Ordinal)));
             storage.SetEntity(entity);
             result.Status = DesignOperationStatus.Succeeded;
             result.ErrorCode = DesignErrorCode.None;
@@ -115,6 +148,7 @@ namespace FCUAutoDesign
             builder.AddSimpleField(StatusField, typeof(int));
             builder.AddSimpleField(PayloadField, typeof(string));
             builder.AddSimpleField(UpdatedAtField, typeof(string));
+            builder.AddSimpleField(RoomUniqueIdsField, typeof(string));
             return builder.Finish();
         }
 

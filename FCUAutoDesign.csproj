@@ -100,6 +100,8 @@
     <Compile Include="Services\RoomRuleSnapshotReader.cs" />
     <Compile Include="Services\FcuBusinessPreviewService.cs" />
     <Compile Include="Services\DesignRecordRepository.cs" />
+    <Compile Include="Services\DesignRecordPayloadCodec.cs" />
+    <Compile Include="Services\DesignRecordBuilder.cs" />
     <Compile Include="Models\RoomExecutionResult.cs" />
     <Compile Include="Models\DesignRecordContract.cs" />
     <Compile Include="Domain\EquipmentSelection\EquipmentSelectionModels.cs" />

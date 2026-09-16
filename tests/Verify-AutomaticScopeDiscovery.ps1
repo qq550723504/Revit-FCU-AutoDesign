@@ -22,6 +22,8 @@ namespace FCUAutoDesign
             Check(partial.UniqueCandidateId == null && partial.EligibleCandidateIds.Count == 0, "Partial branch cannot represent the shared main");
             var ambiguous = LinearMainCandidateSelector.Select(new List<LinearMainCandidate> { Candidate("a",0,10), Candidate("b",0,10,1) }, rooms, .01);
             Check(ambiguous.UniqueCandidateId == null && ambiguous.EligibleCandidateIds.Count == 2, "Multiple covering pipes require user selection");
+            Check(LinearMainCandidateSelector.CoversAll(new[] { Candidate("left",0,4.9), Candidate("right",5.1,10) },
+                rooms, .01), "Connected main segments may cover different room points as one run");
             var endpoint = LinearMainCandidateSelector.Select(new List<LinearMainCandidate> { Candidate("main",0,10) },
                 new List<Point3D> { new Point3D(0,2,0) }, .01);
             Check(endpoint.UniqueCandidateId == null, "Room projection at pipe endpoint is rejected");

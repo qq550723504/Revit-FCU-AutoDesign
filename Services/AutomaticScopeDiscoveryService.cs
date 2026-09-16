@@ -96,23 +96,38 @@ namespace FCUAutoDesign
                     && Math.Abs(x.Item2.Direction.Z) < 1e-6
                     && x.Item1.ReferenceLevel != null && x.Item1.ReferenceLevel.Id == levelId
                     && Classification(doc, x.Item1) == classification).ToList();
-            List<LinearMainCandidate> geometry = candidates.Select(x => new LinearMainCandidate
-            {
-                Id = x.Item1.UniqueId,
-                Start = Point(x.Item2.GetEndPoint(0)),
-                End = Point(x.Item2.GetEndPoint(1))
-            }).ToList();
             FamilySymbol symbol = doc.GetElement(new ElementId(options.SelectedFcuTypeId)) as FamilySymbol;
             BoundingBoxXYZ familyBounds = symbol?.get_BoundingBox(null);
             double familyPlanExtent = familyBounds == null ? 0 : Math.Sqrt(
                 Math.Pow(familyBounds.Max.X - familyBounds.Min.X, 2)
                 + Math.Pow(familyBounds.Max.Y - familyBounds.Min.Y, 2));
-            LinearMainCandidateResult selected = LinearMainCandidateSelector.Select(geometry, approaches,
-                Math.Max(Math.Max(doc.Application.ShortCurveTolerance, RevitUnits.MM_TO_FEET), familyPlanExtent));
-            foreach (string id in selected.EligibleCandidateIds)
-                result.EligiblePipes.Add(candidates.Single(x => x.Item1.UniqueId == id).Item1);
-            result.UniquePipe = string.IsNullOrEmpty(selected.UniqueCandidateId)
-                ? null : candidates.Single(x => x.Item1.UniqueId == selected.UniqueCandidateId).Item1;
+            double endpointTolerance = Math.Max(
+                Math.Max(doc.Application.ShortCurveTolerance, RevitUnits.MM_TO_FEET), familyPlanExtent);
+            Dictionary<string, Tuple<Pipe, IList<LinearMainCandidate>>> runs =
+                new Dictionary<string, Tuple<Pipe, IList<LinearMainCandidate>>>(StringComparer.Ordinal);
+            foreach (Pipe candidate in candidates.Select(x => x.Item1))
+            {
+                IList<Pipe> runPipes = new MainPipeRun(candidate).ExistingSegments(doc);
+                string key = string.Join("|", runPipes.Select(x => x.UniqueId).OrderBy(x => x, StringComparer.Ordinal));
+                if (runs.ContainsKey(key)) continue;
+                Pipe representative = runPipes.OrderByDescending(x => ((x.Location as LocationCurve)?.Curve?.Length ?? 0))
+                    .ThenBy(x => x.UniqueId, StringComparer.Ordinal).First();
+                IList<LinearMainCandidate> segments = runPipes.Select(pipe =>
+                {
+                    Line line = (pipe.Location as LocationCurve)?.Curve as Line;
+                    return new LinearMainCandidate
+                    {
+                        Id = pipe.UniqueId,
+                        Start = Point(line.GetEndPoint(0)),
+                        End = Point(line.GetEndPoint(1))
+                    };
+                }).ToList();
+                runs.Add(key, Tuple.Create(representative, segments));
+            }
+            foreach (Tuple<Pipe, IList<LinearMainCandidate>> run in runs.Values)
+                if (LinearMainCandidateSelector.CoversAll(run.Item2, approaches, endpointTolerance))
+                    result.EligiblePipes.Add(run.Item1);
+            result.UniquePipe = result.EligiblePipes.Count == 1 ? result.EligiblePipes[0] : null;
             return result;
         }
 

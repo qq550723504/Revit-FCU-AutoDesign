@@ -16,6 +16,7 @@ namespace FCUAutoDesign
         {
             if (initial == null) throw new ArgumentNullException("initial");
             segments.Add(initial.Id);
+            DiscoverExistingStraightRun(initial);
             NetworkId = "main:" + initial.UniqueId;
         }
         private MainPipeRun(IEnumerable<ElementId> ids, string networkId)
@@ -23,6 +24,10 @@ namespace FCUAutoDesign
             segments.UnionWith(ids); NetworkId = networkId;
         }
         public MainPipeRun Fork() { return new MainPipeRun(segments, NetworkId); }
+        internal IList<Pipe> ExistingSegments(Document doc)
+        {
+            return segments.Select(id => doc.GetElement(id) as Pipe).Where(x => x != null).ToList();
+        }
         public Pipe AnySegment(Document doc)
         {
             return segments.Select(id => doc.GetElement(id) as Pipe).FirstOrDefault(p => p != null)
@@ -52,6 +57,73 @@ namespace FCUAutoDesign
             if (connection == null || !connection.TeeCreated) return;
             segments.Add(connection.MainPart1Id);
             segments.Add(connection.MainPart2Id);
+        }
+
+        private void DiscoverExistingStraightRun(Pipe initial)
+        {
+            Document doc = initial.Document;
+            Line seed = (initial.Location as LocationCurve)?.Curve as Line;
+            if (seed == null || !seed.IsBound) return;
+            XYZ seedDirection = seed.Direction.Normalize();
+            ElementId systemTypeId = initial.get_Parameter(
+                BuiltInParameter.RBS_PIPING_SYSTEM_TYPE_PARAM)?.AsElementId() ?? ElementId.InvalidElementId;
+            double tolerance = Math.Max(doc.Application.ShortCurveTolerance, MM_TO_FEET);
+            Queue<Element> queue = new Queue<Element>();
+            HashSet<ElementId> visited = new HashSet<ElementId>();
+            queue.Enqueue(initial);
+            while (queue.Count > 0)
+            {
+                Element owner = queue.Dequeue();
+                if (owner == null || !visited.Add(owner.Id)) continue;
+                foreach (Connector connector in Connectors(owner))
+                foreach (Connector reference in connector.AllRefs.Cast<Connector>())
+                {
+                    if (reference.Domain != Domain.DomainPiping || !connector.IsConnectedTo(reference)) continue;
+                    Element adjacent = reference.Owner;
+                    Pipe pipe = adjacent as Pipe;
+                    if (pipe != null)
+                    {
+                        if (!Qualifies(pipe, seed, seedDirection, systemTypeId, tolerance)) continue;
+                        if (segments.Add(pipe.Id)) queue.Enqueue(pipe);
+                    }
+                    else if (adjacent is FamilyInstance fitting
+                        && fitting.Category != null
+                        && fitting.Category.Id.IntegerValue == (int)BuiltInCategory.OST_PipeFitting)
+                    {
+                        queue.Enqueue(fitting);
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<Connector> Connectors(Element element)
+        {
+            Pipe pipe = element as Pipe;
+            if (pipe != null) return pipe.ConnectorManager.Connectors.Cast<Connector>();
+            FamilyInstance fitting = element as FamilyInstance;
+            return fitting?.MEPModel?.ConnectorManager == null
+                ? Enumerable.Empty<Connector>()
+                : fitting.MEPModel.ConnectorManager.Connectors.Cast<Connector>();
+        }
+
+        private static bool Qualifies(Pipe pipe, Line seed, XYZ seedDirection,
+            ElementId systemTypeId, double tolerance)
+        {
+            Line line = (pipe.Location as LocationCurve)?.Curve as Line;
+            if (line == null || !line.IsBound || Math.Abs(line.Direction.DotProduct(seedDirection)) < 1.0 - 1e-6)
+                return false;
+            ElementId candidateSystem = pipe.get_Parameter(
+                BuiltInParameter.RBS_PIPING_SYSTEM_TYPE_PARAM)?.AsElementId() ?? ElementId.InvalidElementId;
+            if (candidateSystem != systemTypeId) return false;
+            XYZ origin = seed.GetEndPoint(0);
+            return DistanceToAxis(line.GetEndPoint(0), origin, seedDirection) <= tolerance
+                && DistanceToAxis(line.GetEndPoint(1), origin, seedDirection) <= tolerance;
+        }
+
+        private static double DistanceToAxis(XYZ point, XYZ origin, XYZ direction)
+        {
+            XYZ offset = point - origin;
+            return (offset - direction * offset.DotProduct(direction)).GetLength();
         }
         public void VerifyPrevious(Document doc, TeeConnectionResult prior, TeeConnectionResult current)
         {

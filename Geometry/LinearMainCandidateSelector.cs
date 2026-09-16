@@ -30,21 +30,30 @@ namespace FCUAutoDesign
             foreach (LinearMainCandidate candidate in candidates.Where(x => x != null)
                 .OrderBy(x => x.Id, StringComparer.Ordinal))
             {
-                Vector3D axis = candidate.End - candidate.Start;
-                double lengthSquared = axis.X * axis.X + axis.Y * axis.Y;
-                if (lengthSquared <= endpointTolerance * endpointTolerance) continue;
-                double length = Math.Sqrt(lengthSquared);
-                bool coversAll = approaches.All(point =>
-                {
-                    double t = ((point.X - candidate.Start.X) * axis.X
-                        + (point.Y - candidate.Start.Y) * axis.Y) / lengthSquared;
-                    return t * length > endpointTolerance && (1 - t) * length > endpointTolerance;
-                });
-                if (coversAll) result.EligibleCandidateIds.Add(candidate.Id);
+                if (CoversAll(new[] { candidate }, approaches, endpointTolerance))
+                    result.EligibleCandidateIds.Add(candidate.Id);
             }
             if (result.EligibleCandidateIds.Count == 1)
                 result.UniqueCandidateId = result.EligibleCandidateIds[0];
             return result;
+        }
+
+        public static bool CoversAll(IEnumerable<LinearMainCandidate> segments,
+            IEnumerable<Point3D> approaches, double endpointTolerance)
+        {
+            List<LinearMainCandidate> values = segments.Where(x => x != null).ToList();
+            return approaches.All(point => values.Any(candidate => Covers(candidate, point, endpointTolerance)));
+        }
+
+        private static bool Covers(LinearMainCandidate candidate, Point3D point, double endpointTolerance)
+        {
+            Vector3D axis = candidate.End - candidate.Start;
+            double lengthSquared = axis.X * axis.X + axis.Y * axis.Y;
+            if (lengthSquared <= endpointTolerance * endpointTolerance) return false;
+            double length = Math.Sqrt(lengthSquared);
+            double t = ((point.X - candidate.Start.X) * axis.X
+                + (point.Y - candidate.Start.Y) * axis.Y) / lengthSquared;
+            return t * length > endpointTolerance && (1 - t) * length > endpointTolerance;
         }
     }
 }

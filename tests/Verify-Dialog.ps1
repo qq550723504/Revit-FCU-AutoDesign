@@ -45,6 +45,7 @@ try {
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Default parameters accepted'
     Assert-True ($window.FindName('ChkMultipleFcus').IsChecked -eq $true -and $window.EnableMultipleFcus) 'Multi-FCU placement enabled by default'
     Assert-True ($window.FindName('ChkAutomaticScope').IsChecked -eq $false -and -not $window.EnableAutomaticScopeDiscovery) 'Automatic scope discovery is explicit opt-in'
+    Assert-True ($window.FindName('TxtAutomaticRoomKeywords').Text -eq '会议室;办公室') 'Target room keywords have an explicit editable default'
     Assert-True ($null -eq $window.FindName('TxtCondensateSlope')) 'No condensate slope input exists'
     $window.FindName('ChkEnableCondensate').IsChecked = $true
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Enabled condensate needs no slope setting'
@@ -74,5 +75,10 @@ try {
     $window.FindName('TxtMinimumStraight').Text = ''
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Minimum may be cleared'
     Assert-True ($null -eq $window.MinimumStraightLengthMm) 'Cleared minimum is unknown, not zero'
+    $window.FindName('ChkAutomaticScope').IsChecked = $true
+    $window.FindName('TxtAutomaticRoomKeywords').Text = ' ;，'
+    Assert-True (-not [bool]$readParameters.Invoke($window, @())) 'Automatic discovery rejects an empty room keyword set'
+    $window.FindName('TxtAutomaticRoomKeywords').Text = '会议室;办公室'
+    Assert-True ([bool]$readParameters.Invoke($window, @())) 'Automatic discovery accepts configured room keywords'
 } finally { $window.Close() }
 Write-Output "$script:checks checks passed. Revit geometry/connection tests are NOT_RUN by this script."

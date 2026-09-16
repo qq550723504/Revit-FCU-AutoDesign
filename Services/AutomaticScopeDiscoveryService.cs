@@ -7,6 +7,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.UI;
+using FCUAutoDesign.Business.RoomSelection;
 
 namespace FCUAutoDesign
 {
@@ -25,7 +26,7 @@ namespace FCUAutoDesign
 
     internal sealed class AutomaticScopeDiscoveryService
     {
-        public RoomDiscoveryResult DiscoverRooms(Document doc, View view)
+        public RoomDiscoveryResult DiscoverRooms(Document doc, View view, IEnumerable<string> nameKeywords)
         {
             RoomDiscoveryResult result = new RoomDiscoveryResult();
             if (view == null || view.IsTemplate || view.GenLevel == null)
@@ -40,6 +41,8 @@ namespace FCUAutoDesign
                 string label = (room.Number ?? room.Id.IntegerValue.ToString()) + " " + (room.Name ?? string.Empty);
                 if (room.LevelId != view.GenLevel.Id) result.Rejections.Add(label + "：不在当前视图标高。");
                 else if (room.Location == null || room.Area <= 0) result.Rejections.Add(label + "：未放置或未形成有效封闭面积。");
+                else if (!RoomNameKeywordPolicy.Matches(room.Name, nameKeywords))
+                    result.Rejections.Add(label + "：名称不匹配自动设计关键词。");
                 else result.Rooms.Add(room);
             }
             return result;

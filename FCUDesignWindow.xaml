@@ -86,6 +86,11 @@
                     <Border BorderBrush="#334155" BorderThickness="0,1,0,0" Margin="0,6,0,8" Padding="0,6,0,0">
                         <StackPanel>
                             <CheckBox x:Name="ChkAutomaticScope" Content="自动发现当前平面视图房间和主管（预览确认后使用）" IsChecked="False" Foreground="#67e8f9" Margin="0,3,0,3" FontSize="11"/>
+                            <Grid Margin="18,2,0,5" IsEnabled="{Binding IsChecked, ElementName=ChkAutomaticScope}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="房间名称关键词：" ToolTip="使用分号或逗号分隔；名称包含任一关键词即进入候选。" VerticalAlignment="Center" Foreground="#a5f3fc" FontSize="11"/>
+                                <TextBox x:Name="TxtAutomaticRoomKeywords" Grid.Column="1" Text="会议室;办公室" Background="#0f172a" Foreground="#67e8f9" BorderBrush="#475569" Padding="4"/>
+                            </Grid>
                             <CheckBox x:Name="ChkAutoDn" Content="按面积分档选择管径 (&lt;25㎡: DN20, ≥25㎡: DN25)" IsChecked="True" Foreground="#93c5fd" Margin="0,3,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkBusinessPreview" Content="启用 FCU-201 业务规则预览（确认后继续现有 PoC）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkMultipleFcus" Content="按 L/5 向上取整放置多台（均使用所选族类型）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>

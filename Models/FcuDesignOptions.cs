@@ -19,5 +19,6 @@ namespace FCUAutoDesign
         public bool EnableCondensate { get; set; }
         public bool BreakCurveAndTee { get; set; }
         public bool EnableAutomaticScopeDiscovery { get; set; }
+        public System.Collections.Generic.IList<string> AutomaticRoomNameKeywords { get; set; }
     }
 }

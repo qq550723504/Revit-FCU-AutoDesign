@@ -1,7 +1,9 @@
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName WindowsBase
 $source = Get-Content (Join-Path $PSScriptRoot '..\Geometry\LinearMainCandidateSelector.cs') -Raw -Encoding UTF8
+$policy = Get-Content (Join-Path $PSScriptRoot '..\Business\RoomSelection\RoomNameKeywordPolicy.cs') -Raw -Encoding UTF8
 $source = [regex]::Replace($source, '(?m)^using .*;\r?$', '')
+$policy = [regex]::Replace($policy, '(?m)^using .*;\r?$', '')
 $checks = @'
 namespace FCUAutoDesign
 {
@@ -23,6 +25,11 @@ namespace FCUAutoDesign
             var endpoint = LinearMainCandidateSelector.Select(new List<LinearMainCandidate> { Candidate("main",0,10) },
                 new List<Point3D> { new Point3D(0,2,0) }, .01);
             Check(endpoint.UniqueCandidateId == null, "Room projection at pipe endpoint is rejected");
+            var keywords = Business.RoomSelection.RoomNameKeywordPolicy.Parse("会议室; 办公室，会议室");
+            Check(keywords.Count == 2 && Business.RoomSelection.RoomNameKeywordPolicy.Matches("大会议室 01", keywords),
+                "Configured room name keywords use contains matching");
+            Check(!Business.RoomSelection.RoomNameKeywordPolicy.Matches("卫生间", keywords),
+                "Non-target room name is excluded");
             Console.WriteLine(count + " automatic scope checks passed. Revit view discovery is NOT_RUN.");
         }
     }
@@ -35,7 +42,7 @@ $presentationCore = 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Frame
 $testDir = Join-Path ([IO.Path]::GetTempPath()) ('FCU-AutomaticScope-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($testDir)
 $testSource = Join-Path $testDir 'Checks.cs'; $exe = Join-Path $testDir 'Checks.exe'
-$combined = $imports + $source + [Environment]::NewLine + $checks + [Environment]::NewLine `
+$combined = $imports + $source + [Environment]::NewLine + $policy + [Environment]::NewLine + $checks + [Environment]::NewLine `
     + 'public static class Program { public static void Main() { FCUAutoDesign.AutomaticScopeChecks.Run(); } }'
 [IO.File]::WriteAllText($testSource, $combined)
 & $compiler /nologo /target:exe "/out:$exe" "/reference:$windowsBase" "/reference:$presentationCore" $testSource

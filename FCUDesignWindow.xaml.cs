@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Windows;
+using FCUAutoDesign.Business.RoomSelection;
 
 namespace FCUAutoDesign
 {
@@ -19,6 +20,7 @@ namespace FCUAutoDesign
         public bool EnableCondensate { get; private set; } = false;
         public bool BreakCurveAndTee { get; private set; } = true;
         public bool EnableAutomaticScopeDiscovery { get; private set; } = false;
+        public IList<string> AutomaticRoomNameKeywords { get; private set; } = new List<string>();
         public bool IsConfirmed { get; private set; } = false;
         public int? SelectedFcuTypeId => FcuTypePicker.SelectedValue as int?;
 
@@ -37,7 +39,7 @@ namespace FCUAutoDesign
         {
             if (!TryReadParameters())
             {
-                MessageBox.Show(this, "请选择 FCU 类型。距离、高度必须是有限正数；最小净直管可留空，填写时必须为正数且小于目标接管距离。冷指标须非负。", "参数无效");
+                MessageBox.Show(this, "请选择 FCU 类型。距离、高度必须是有限正数；最小净直管可留空，填写时必须为正数且小于目标接管距离。冷指标须非负。启用自动发现时，房间名称关键词不能为空。", "参数无效");
                 return;
             }
 
@@ -75,6 +77,9 @@ namespace FCUAutoDesign
             MinimumStraightLengthMm = minimumStraight;
             FlipDropMm = fDrop;
             CoolingIndexWPerSquareMeter = coolingIndex;
+            IList<string> roomKeywords = RoomNameKeywordPolicy.Parse(TxtAutomaticRoomKeywords.Text);
+            if (ChkAutomaticScope.IsChecked == true && roomKeywords.Count == 0) return false;
+            AutomaticRoomNameKeywords = roomKeywords;
             return true;
         }
 

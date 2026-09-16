@@ -66,7 +66,8 @@ namespace FCUAutoDesign
                     EnableReturnPipe = uiWindow.EnableReturnPipe,
                     EnableCondensate = uiWindow.EnableCondensate,
                     BreakCurveAndTee = uiWindow.BreakCurveAndTee,
-                    EnableAutomaticScopeDiscovery = uiWindow.EnableAutomaticScopeDiscovery
+                    EnableAutomaticScopeDiscovery = uiWindow.EnableAutomaticScopeDiscovery,
+                    AutomaticRoomNameKeywords = uiWindow.AutomaticRoomNameKeywords
                 };
 
                 // =========================================================================
@@ -77,7 +78,8 @@ namespace FCUAutoDesign
                 List<Room> rooms = null;
                 if (options.EnableAutomaticScopeDiscovery)
                 {
-                    RoomDiscoveryResult discovered = discoveryService.DiscoverRooms(doc, doc.ActiveView);
+                    RoomDiscoveryResult discovered = discoveryService.DiscoverRooms(doc, doc.ActiveView,
+                        options.AutomaticRoomNameKeywords);
                     bool? useDiscoveredRooms = discoveryService.ConfirmRooms(discovered);
                     if (!useDiscoveredRooms.HasValue) return Result.Cancelled;
                     if (useDiscoveredRooms.Value) rooms = discovered.Rooms.ToList();

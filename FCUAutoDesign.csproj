@@ -115,6 +115,7 @@
     <Compile Include="Business\Hydraulic\HydraulicTable.cs" />
     <Compile Include="Business\DesignReconciliation\DesignReconciliation.cs" />
     <Compile Include="Business\DesignReconciliation\ReconciliationApplyPolicy.cs" />
+    <Compile Include="Business\RoomSelection\RoomNameKeywordPolicy.cs" />
     <Compile Include="Presentation\BatchReportPresenter.cs" />
     <Compile Include="Presentation\ExecutionReportPresenter.cs" />
     <Compile Include="Presentation\CondensateMainPicker.cs" />

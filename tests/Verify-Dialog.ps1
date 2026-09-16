@@ -44,6 +44,7 @@ $window = New-TestWindow
 try {
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Default parameters accepted'
     Assert-True ($window.FindName('ChkMultipleFcus').IsChecked -eq $true -and $window.EnableMultipleFcus) 'Multi-FCU placement enabled by default'
+    Assert-True ($window.FindName('ChkAutomaticScope').IsChecked -eq $false -and -not $window.EnableAutomaticScopeDiscovery) 'Automatic scope discovery is explicit opt-in'
     Assert-True ($null -eq $window.FindName('TxtCondensateSlope')) 'No condensate slope input exists'
     $window.FindName('ChkEnableCondensate').IsChecked = $true
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Enabled condensate needs no slope setting'

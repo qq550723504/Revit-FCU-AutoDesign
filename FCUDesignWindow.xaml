@@ -85,6 +85,7 @@
                     <!-- 功能控制开关 (已修复 XAML 转义与参数接通) -->
                     <Border BorderBrush="#334155" BorderThickness="0,1,0,0" Margin="0,6,0,8" Padding="0,6,0,0">
                         <StackPanel>
+                            <CheckBox x:Name="ChkAutomaticScope" Content="自动发现当前平面视图房间和主管（预览确认后使用）" IsChecked="False" Foreground="#67e8f9" Margin="0,3,0,3" FontSize="11"/>
                             <CheckBox x:Name="ChkAutoDn" Content="按面积分档选择管径 (&lt;25㎡: DN20, ≥25㎡: DN25)" IsChecked="True" Foreground="#93c5fd" Margin="0,3,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkBusinessPreview" Content="启用 FCU-201 业务规则预览（确认后继续现有 PoC）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkMultipleFcus" Content="按 L/5 向上取整放置多台（均使用所选族类型）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
@@ -101,7 +102,7 @@
         <!-- 底部触发按钮 -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
             <Button x:Name="BtnCancel" Content="取消" Width="80" Height="32" Margin="0,0,10,0" Background="#334155" Foreground="#e2e8f0" BorderThickness="0" Click="BtnCancel_Click"/>
-            <Button x:Name="BtnRun" Content="确认参数并选择房间" Width="150" Height="32" Background="#0284c7" Foreground="White" FontWeight="Bold" BorderThickness="0" Click="BtnRun_Click"/>
+            <Button x:Name="BtnRun" Content="确认参数并确定范围" Width="150" Height="32" Background="#0284c7" Foreground="White" FontWeight="Bold" BorderThickness="0" Click="BtnRun_Click"/>
         </StackPanel>
     </Grid>
 </Window>

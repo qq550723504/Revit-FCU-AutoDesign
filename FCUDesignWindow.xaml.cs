@@ -18,6 +18,7 @@ namespace FCUAutoDesign
         public bool EnableReturnPipe { get; private set; } = true;
         public bool EnableCondensate { get; private set; } = false;
         public bool BreakCurveAndTee { get; private set; } = true;
+        public bool EnableAutomaticScopeDiscovery { get; private set; } = false;
         public bool IsConfirmed { get; private set; } = false;
         public int? SelectedFcuTypeId => FcuTypePicker.SelectedValue as int?;
 
@@ -46,6 +47,7 @@ namespace FCUAutoDesign
             EnableReturnPipe = ChkEnableReturn.IsChecked == true;
             EnableCondensate = ChkEnableCondensate.IsChecked == true;
             BreakCurveAndTee = ChkBreakCurve.IsChecked == true;
+            EnableAutomaticScopeDiscovery = ChkAutomaticScope.IsChecked == true;
 
             IsConfirmed = true;
             DialogResult = true;

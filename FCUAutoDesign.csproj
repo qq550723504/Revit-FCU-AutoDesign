@@ -93,6 +93,7 @@
     <Compile Include="Geometry\SegmentClearance.cs" />
     <Compile Include="Services\RoutingDiagnostic.cs" />
     <Compile Include="Geometry\MainPipeSegmentLocator.cs" />
+    <Compile Include="Geometry\LinearMainCandidateSelector.cs" />
     <Compile Include="Services\FcuDesignService.cs" />
     <Compile Include="Services\MainPipeRun.cs" />
     <Compile Include="Services\RoomBatchContext.cs" />
@@ -104,6 +105,7 @@
     <Compile Include="Services\DesignRecordBuilder.cs" />
     <Compile Include="Services\DesignSnapshotFingerprint.cs" />
     <Compile Include="Services\DesignReconciliationPreviewService.cs" />
+    <Compile Include="Services\AutomaticScopeDiscoveryService.cs" />
     <Compile Include="Models\RoomExecutionResult.cs" />
     <Compile Include="Models\DesignRecordContract.cs" />
     <Compile Include="Domain\EquipmentSelection\EquipmentSelectionModels.cs" />

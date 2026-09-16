@@ -18,5 +18,6 @@ namespace FCUAutoDesign
         public bool EnableReturnPipe { get; set; }
         public bool EnableCondensate { get; set; }
         public bool BreakCurveAndTee { get; set; }
+        public bool EnableAutomaticScopeDiscovery { get; set; }
     }
 }

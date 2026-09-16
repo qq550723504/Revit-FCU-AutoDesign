@@ -65,17 +65,30 @@ namespace FCUAutoDesign
                     SelectedDoorIds = new Dictionary<int, ElementId>(),
                     EnableReturnPipe = uiWindow.EnableReturnPipe,
                     EnableCondensate = uiWindow.EnableCondensate,
-                    BreakCurveAndTee = uiWindow.BreakCurveAndTee
+                    BreakCurveAndTee = uiWindow.BreakCurveAndTee,
+                    EnableAutomaticScopeDiscovery = uiWindow.EnableAutomaticScopeDiscovery
                 };
 
                 // =========================================================================
                 // 1. 引导用户拾取目标房间与走廊供水水平主管
                 // =========================================================================
                 int totalSteps = 2 + (options.EnableReturnPipe ? 1 : 0) + (options.EnableCondensate ? 1 : 0);
-                IList<Reference> roomRefs = uidoc.Selection.PickObjects(ObjectType.Element, new RoomFilter(),
-                    $"【步骤 1/{totalSteps}】请选择同楼层房间，选完点击“完成”（多门房间随后指定目标门）");
-                List<Room> rooms = roomRefs.Select(r => doc.GetElement(r) as Room)
-                    .Where(r => r != null).GroupBy(r => r.Id.IntegerValue).Select(g => g.First()).ToList();
+                AutomaticScopeDiscoveryService discoveryService = new AutomaticScopeDiscoveryService();
+                List<Room> rooms = null;
+                if (options.EnableAutomaticScopeDiscovery)
+                {
+                    RoomDiscoveryResult discovered = discoveryService.DiscoverRooms(doc, doc.ActiveView);
+                    bool? useDiscoveredRooms = discoveryService.ConfirmRooms(discovered);
+                    if (!useDiscoveredRooms.HasValue) return Result.Cancelled;
+                    if (useDiscoveredRooms.Value) rooms = discovered.Rooms.ToList();
+                }
+                if (rooms == null)
+                {
+                    IList<Reference> roomRefs = uidoc.Selection.PickObjects(ObjectType.Element, new RoomFilter(),
+                        $"【步骤 1/{totalSteps}】请选择同楼层房间，选完点击“完成”（多门房间随后指定目标门）");
+                    rooms = roomRefs.Select(r => doc.GetElement(r) as Room)
+                        .Where(r => r != null).GroupBy(r => r.Id.IntegerValue).Select(g => g.First()).ToList();
+                }
                 if (rooms.Count == 0) return Result.Cancelled;
                 FcuBatchService.ValidateRooms(rooms);
 
@@ -123,20 +136,44 @@ namespace FCUAutoDesign
                         return Result.Cancelled;
                 }
 
-                Reference supplyRef = uidoc.Selection.PickObject(ObjectType.Element, new PipeFilter(MEPSystemClassification.SupplyHydronic), $"【步骤 2/{totalSteps}】请选择供水水平主管（仅接受 SupplyHydronic 系统分类）");
-                Pipe supplyMainPipe = doc.GetElement(supplyRef) as Pipe;
+                PipeDiscoveryResult supplyDiscovery = null, returnDiscovery = null, drainDiscovery = null;
+                bool useAutomaticPipes = false;
+                if (options.EnableAutomaticScopeDiscovery)
+                {
+                    supplyDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms,
+                        MEPSystemClassification.SupplyHydronic, "供水主管");
+                    if (options.EnableReturnPipe)
+                        returnDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms,
+                            MEPSystemClassification.ReturnHydronic, "回水主管");
+                    if (options.EnableCondensate)
+                        drainDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms,
+                            MEPSystemClassification.Sanitary, "冷凝水主管");
+                    bool? useDiscoveredPipes = discoveryService.ConfirmPipes(
+                        new[] { supplyDiscovery, returnDiscovery, drainDiscovery }.Where(x => x != null));
+                    if (!useDiscoveredPipes.HasValue) return Result.Cancelled;
+                    useAutomaticPipes = useDiscoveredPipes.Value;
+                }
+
+                Pipe supplyMainPipe = useAutomaticPipes ? supplyDiscovery?.UniquePipe : null;
+                if (supplyMainPipe == null)
+                {
+                    Reference supplyRef = uidoc.Selection.PickObject(ObjectType.Element,
+                        new PipeFilter(MEPSystemClassification.SupplyHydronic),
+                        $"【步骤 2/{totalSteps}】请选择供水水平主管（仅接受 SupplyHydronic 系统分类）");
+                    supplyMainPipe = doc.GetElement(supplyRef) as Pipe;
+                }
                 if (supplyMainPipe == null) return Result.Cancelled;
 
                 // 2. 根据用户勾选决定是否提示拾取回水主管
-                Pipe returnMainPipe = null;
+                Pipe returnMainPipe = useAutomaticPipes ? returnDiscovery?.UniquePipe : null;
                 if (options.EnableReturnPipe)
                 {
                     try
                     {
-                        Reference returnRef = uidoc.Selection.PickObject(ObjectType.Element, new PipeFilter(MEPSystemClassification.ReturnHydronic), $"【步骤 3/{totalSteps}】请选择回水水平主管（仅接受 ReturnHydronic 系统分类，按 ESC 可跳过）");
-                        if (returnRef != null)
+                        if (returnMainPipe == null)
                         {
-                            returnMainPipe = doc.GetElement(returnRef) as Pipe;
+                            Reference returnRef = uidoc.Selection.PickObject(ObjectType.Element, new PipeFilter(MEPSystemClassification.ReturnHydronic), $"【步骤 3/{totalSteps}】请选择回水水平主管（仅接受 ReturnHydronic 系统分类，按 ESC 可跳过）");
+                            if (returnRef != null) returnMainPipe = doc.GetElement(returnRef) as Pipe;
                         }
                     }
                     catch (Autodesk.Revit.Exceptions.OperationCanceledException)
@@ -145,10 +182,11 @@ namespace FCUAutoDesign
                     }
                 }
 
-                Pipe condensateMainPipe = null;
+                Pipe condensateMainPipe = useAutomaticPipes ? drainDiscovery?.UniquePipe : null;
                 if (options.EnableCondensate)
                 {
-                    condensateMainPipe = new CondensateMainPicker().Pick(uidoc, totalSteps);
+                    if (condensateMainPipe == null)
+                        condensateMainPipe = new CondensateMainPicker().Pick(uidoc, totalSteps);
                     if (condensateMainPipe == null) return Result.Cancelled;
                 }
 

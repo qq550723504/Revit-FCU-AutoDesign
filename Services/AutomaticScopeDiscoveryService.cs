@@ -15,6 +15,7 @@ namespace FCUAutoDesign
     {
         public IList<Room> Rooms { get; } = new List<Room>();
         public IList<string> Rejections { get; } = new List<string>();
+        public IDictionary<int, ElementId> ResolvedDoorIds { get; } = new Dictionary<int, ElementId>();
     }
 
     internal sealed class PipeDiscoveryResult
@@ -43,7 +44,28 @@ namespace FCUAutoDesign
                 else if (room.Location == null || room.Area <= 0) result.Rejections.Add(label + "：未放置或未形成有效封闭面积。");
                 else if (!RoomNameKeywordPolicy.Matches(room.Name, nameKeywords))
                     result.Rejections.Add(label + "：名称不匹配自动设计关键词。");
-                else result.Rooms.Add(room);
+                else
+                {
+                    List<FamilyInstance> doors = RoomRuleSnapshotReader.FindDoors(doc, room);
+                    List<FamilyInstance> validDoors = doors.Where(door =>
+                        new RoomRuleSnapshotReader().Read(doc, room, door).IsValid).ToList();
+                    if (validDoors.Count == 0)
+                    {
+                        string reason = doors.Count == 0
+                            ? "没有关联门，无法确定门侧 L 轴。"
+                            : new RoomRuleSnapshotReader().Read(doc, room, doors[0]).ErrorMessage;
+                        result.Rejections.Add(label + "：" + reason);
+                        continue;
+                    }
+
+                    FamilyInstance automaticDoor = RoomRuleSnapshotReader.ResolveDoorForRoom(doc, room);
+                    FamilyInstance resolved = automaticDoor != null
+                        && validDoors.Any(x => x.Id == automaticDoor.Id)
+                        ? automaticDoor
+                        : validDoors.Count == 1 ? validDoors[0] : null;
+                    if (resolved != null) result.ResolvedDoorIds[room.Id.IntegerValue] = resolved.Id;
+                    result.Rooms.Add(room);
+                }
             }
             return result;
         }

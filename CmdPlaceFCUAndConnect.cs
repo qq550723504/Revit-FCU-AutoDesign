@@ -76,13 +76,20 @@ namespace FCUAutoDesign
                 int totalSteps = 2 + (options.EnableReturnPipe ? 1 : 0) + (options.EnableCondensate ? 1 : 0);
                 AutomaticScopeDiscoveryService discoveryService = new AutomaticScopeDiscoveryService();
                 List<Room> rooms = null;
+                RoomDiscoveryResult automaticRoomDiscovery = null;
                 if (options.EnableAutomaticScopeDiscovery)
                 {
                     RoomDiscoveryResult discovered = discoveryService.DiscoverRooms(doc, doc.ActiveView,
                         options.AutomaticRoomNameKeywords);
                     bool? useDiscoveredRooms = discoveryService.ConfirmRooms(discovered);
                     if (!useDiscoveredRooms.HasValue) return Result.Cancelled;
-                    if (useDiscoveredRooms.Value) rooms = discovered.Rooms.ToList();
+                    if (useDiscoveredRooms.Value)
+                    {
+                        rooms = discovered.Rooms.ToList();
+                        automaticRoomDiscovery = discovered;
+                        foreach (KeyValuePair<int, ElementId> door in discovered.ResolvedDoorIds)
+                            options.SelectedDoorIds[door.Key] = door.Value;
+                    }
                 }
                 if (rooms == null)
                 {
@@ -98,6 +105,8 @@ namespace FCUAutoDesign
                 // 并把同一选择传给业务预览和后续放置流程。
                 foreach (Room room in rooms)
                 {
+                    if (automaticRoomDiscovery != null
+                        && options.SelectedDoorIds.ContainsKey(room.Id.IntegerValue)) continue;
                     List<FamilyInstance> doors = RoomRuleSnapshotReader.FindDoors(doc, room);
                     FamilyInstance automaticDoor = RoomRuleSnapshotReader.ResolveDoorForRoom(doc, room);
                     if (automaticDoor != null)

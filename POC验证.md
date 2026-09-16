@@ -4,6 +4,16 @@
 
 ## 2026-09-16 直达路线、首段安装净长与墙体检查
 
+### 后续回归修复：最小净长留空不能隐含锁死目标距离
+
+现场截图及 `route-20260916-021334-75086c487707466cac13305d489a12f4.txt` 显示：整房间 1.18 秒，供回水已连接，冷凝水预筛 264、跳过 264、试建 0。全部首段撞同一供水下翻管；`earlyLeads(mm)` 为空。根因是 aae8618 在最小净长留空时禁用了提前转弯，错误地把 400 mm 目标距离当作硬下限。该版本此用例为 FAIL。
+
+修复后无论是否填写最小净长都计算障碍前转弯建议；显式填写时筛掉不满足下限的建议，且保持安装后与提交后的实际净长验证。留空不伪造规范值，允许缩短并明确未校验工程安装净长。此规则替代下面历史记录中的“未指定时禁止缩短”。实体碰撞、墙体、连接链、回滚及试建预算不变。
+
+PASS：Release/Revit2020 Rebuild Exit 0；`Verify-OutletLead.ps1` 输出 `28 outlet obstacle checks passed`（新增未知下限保留建议、显式下限过滤、过大下限拒绝、非法下限拒绝）；`Verify-LowerFlipRoute.ps1` 输出 `47 checks passed; 3132 active route candidates validated`；`Verify-Dialog.ps1 -AssemblyPath .\bin\Release\FCUAutoDesign.dll` 输出 `42 checks passed`。命令均使用 Windows PowerShell `-NoProfile -ExecutionPolicy Bypass -File`，窗口测试加 `-STA`。
+
+NOT_RUN：本修复在真实 Revit 内的冷凝水连接、墙体碰撞及多房间验收。不能用单元测试证明现场已接通。
+
 三路优先不下翻；新增可空的最小净直管参数，接入候选校验与提交后复核。未指定时禁止自动缩短首段。使用 Revit 原生实体交线及干涉过滤器检查宿主直墙穿越和墙内管件，无新增第三方依赖。
 
 PASS 命令和真实输出：

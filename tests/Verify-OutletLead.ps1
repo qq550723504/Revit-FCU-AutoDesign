@@ -101,6 +101,13 @@ namespace FCUAutoDesign
             var replay=OutletLeadPlanner.BeforeObstacles(P(0,0,0),dir,
                 new[]{actualLead,actualElbow,actualDrop},400,10,100,1);
             Check(replay.SequenceEqual(new[]{252.0,189.0,126.0}),"Measured geometry reproduces logged 252/189/126 mm leads");
+            Check(OutletLeadPlanner.BeforeObstacles(P(0,0,0),dir,new[]{actualLead,actualElbow,actualDrop},400,10,100,1,null)
+                .SequenceEqual(replay),"Unknown installation minimum retains early-turn candidates");
+            Check(OutletLeadPlanner.BeforeObstacles(P(0,0,0),dir,new[]{actualLead,actualElbow,actualDrop},400,10,100,1,200)
+                .SequenceEqual(new[]{252.0}),"Explicit minimum removes candidates below net-length requirement");
+            Check(OutletLeadPlanner.BeforeObstacles(P(0,0,0),dir,new[]{actualLead,actualElbow,actualDrop},400,10,100,1,300)
+                .Length==0,"Hard minimum is not relaxed to escape an obstacle");
+            Reject(()=>OutletLeadPlanner.BeforeObstacles(start,dir,new[]{obstacle},.4,.01,.1,.001,double.NaN),"Invalid optional minimum rejected");
             Check(OutletLeadPlanner.BeforeObstacles(P(0,0,0),dir,new[]{actualLead},400,10,100,1).Length==0,
                 "Measured adjacent supply lead cannot alone propose a positive turn length");
             var measuredPrefix=LowerFlipRoutePlanner.Approach(P(0,0,0),dir,replay[0],150,0,1);

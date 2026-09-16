@@ -42,7 +42,7 @@ namespace FCUAutoDesign
             ExecutionOutcome outcome = new ExecutionOutcome { CondensateEnabled = options.EnableCondensate };
             outcome.Warnings.Add(options.MinimumStraightLengthMm.HasValue
                 ? $"三路首段净直管最小值 {options.MinimumStraightLengthMm.Value:F1} mm，按用户输入校验；不代表阀组/保温/检修空间已验收。"
-                : "未指定工程最小净直管长度；禁止缩短目标首段，但未校验安装净长要求。400 mm 默认值不是规范值。");
+                : "未指定工程最小净直管长度；目标首段允许避障缩短，但未校验安装净长要求。400 mm 默认值不是规范值。");
             outcome.Warnings.Add("仅检查宿主墙的水平正交穿越和墙内管件；未创建洞口或套管，未检查链接模型、保温及施工净距。");
             CondensateDrainResult drainResult = null;
             TeeConnectionResult supplyResult = null;

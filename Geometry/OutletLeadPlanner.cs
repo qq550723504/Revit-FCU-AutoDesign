@@ -11,13 +11,14 @@ namespace FCUAutoDesign
         // allowance 是候选搜索余量，不是工程净距或管件尺寸承诺。
         public static double[] BeforeObstacles(Point3D start, Vector3D outward,
             IEnumerable<Point3D[]> obstacleCorners, double requestedLead,
-            double radius, double allowance, double minLength)
+            double radius, double allowance, double minLength, double? minimumStraightLength = null)
         {
             if (!Valid(start) || !Finite(outward.X) || !Finite(outward.Y) || !Finite(outward.Z)
                 || outward.Length < 1e-9 || Math.Abs(outward.Z) > 1e-6
                 || !Finite(requestedLead) || requestedLead <= 0 || !Finite(radius) || radius <= 0
                 || !Finite(allowance) || allowance <= 0 || !Finite(minLength) || minLength <= 0
-                || obstacleCorners == null)
+                || obstacleCorners == null
+                || (minimumStraightLength.HasValue && (!Finite(minimumStraightLength.Value) || minimumStraightLength.Value <= 0)))
                 throw new InvalidOperationException("设备出管避障输入无效。");
             outward.Z = 0; outward.Normalize();
             Vector3D side = new Vector3D(-outward.Y, outward.X, 0);
@@ -44,7 +45,8 @@ namespace FCUAutoDesign
             if (double.IsPositiveInfinity(nearest) || nearest <= minLength) return new double[0];
             double limit = Math.Min(nearest, requestedLead);
             return new[] { limit, limit * .75, limit * .5 }
-                .Where(x => x > minLength && x < requestedLead - minLength).Distinct().ToArray();
+                .Where(x => x > minLength && x < requestedLead - minLength
+                    && (!minimumStraightLength.HasValue || x > minimumStraightLength.Value)).Distinct().ToArray();
         }
 
         private static bool Finite(double x) { return !double.IsNaN(x) && !double.IsInfinity(x); }

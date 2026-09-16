@@ -64,7 +64,7 @@
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions>
                         <TextBlock Text="最小净直管 (mm，可空):" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="12"/>
-                        <TextBox x:Name="TxtMinimumStraight" Grid.Column="1" Text="" ToolTip="根据实际设备、管件及安装详图填写。生成管件后检查剩余直管净长，不允许低于此值。留空表示未校验工程最小值，并禁止自动缩短目标首段。" Background="#0f172a" Foreground="#34d399" BorderBrush="#475569" Padding="4"/>
+                        <TextBox x:Name="TxtMinimumStraight" Grid.Column="1" Text="" ToolTip="根据实际设备、管件及安装详图填写。生成管件后检查剩余直管净长，不允许低于此值。留空时可按障碍缩短目标首段，但工程安装净长未校验。" Background="#0f172a" Foreground="#34d399" BorderBrush="#475569" Padding="4"/>
                     </Grid>
 
                     <Grid Margin="0,0,0,10">
@@ -79,7 +79,7 @@
 
 
                     <StackPanel IsEnabled="{Binding IsChecked, ElementName=ChkEnableCondensate}">
-                        <TextBlock Text="三路均先尝试不下翻的路线，再尝试下翻避让；穿墙需水平正交，管件在墙外。填写最小净直管后才允许缩短目标首段。冷凝水最多试建 12 次，10 秒后停止新试建；仅验证模型连通，不验证排水坡度。" Foreground="#94a3b8" FontSize="11" TextWrapping="Wrap"/>
+                        <TextBlock Text="三路均先尝试不下翻，再尝试下翻避让。目标首段可避障缩短；已填写的最小净直管不可突破，留空表示安装净长未校验。冷凝水最多试建 12 次，10 秒后停止新试建；不验证排水坡度。" Foreground="#94a3b8" FontSize="11" TextWrapping="Wrap"/>
                     </StackPanel>
 
                     <!-- 功能控制开关 (已修复 XAML 转义与参数接通) -->

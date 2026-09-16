@@ -1,8 +1,10 @@
 $ErrorActionPreference = 'Stop'
 $modelSource = Get-Content (Join-Path $PSScriptRoot '..\Domain\EquipmentSelection\EquipmentSelectionModels.cs') -Raw -Encoding UTF8
 $calculatorSource = Get-Content (Join-Path $PSScriptRoot '..\Domain\EquipmentSelection\EquipmentSelectionCalculator.cs') -Raw -Encoding UTF8
+$plannerSource = Get-Content (Join-Path $PSScriptRoot '..\Domain\EquipmentSelection\EquipmentPlacementPlanner.cs') -Raw -Encoding UTF8
 $modelSource = $modelSource -replace '(?m)^using\s+[^;]+;\s*', ''
 $calculatorSource = $calculatorSource -replace '(?m)^using\s+[^;]+;\s*', ''
+$plannerSource = $plannerSource -replace '(?m)^using\s+[^;]+;\s*', ''
 $checks = @'
 namespace FCUAutoDesign.Business.EquipmentSelection
 {
@@ -113,5 +115,5 @@ namespace FCUAutoDesign.Business.EquipmentSelection
 }
 '@
 $imports = "using System;`r`nusing System.Collections.Generic;`r`nusing System.Linq;`r`n"
-Add-Type -TypeDefinition ($imports + $modelSource + [Environment]::NewLine + $calculatorSource + [Environment]::NewLine + $checks)
+Add-Type -TypeDefinition ($imports + $modelSource + [Environment]::NewLine + $plannerSource + [Environment]::NewLine + $calculatorSource + [Environment]::NewLine + $checks)
 [FCUAutoDesign.Business.EquipmentSelection.EquipmentSelectionChecks]::Run()

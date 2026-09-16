@@ -6,6 +6,7 @@ namespace FCUAutoDesign.Business.EquipmentSelection
 {
     public sealed class EquipmentSelectionCalculator
     {
+        private readonly EquipmentPlacementPlanner placementPlanner = new EquipmentPlacementPlanner();
         private const double MaxSupportedLengthM = 40.0;
         private const double Epsilon = 1e-9;
 
@@ -75,18 +76,9 @@ namespace FCUAutoDesign.Business.EquipmentSelection
                     "最小满足容量对应多个型号，需提供明确型号或选择优先级。");
 
             result.SelectedEquipment = selected;
-            for (int i = 1; i <= result.UnitCount; i++)
-            {
-                result.PlacementPoints.Add(new EquipmentPlacementPoint
-                {
-                    Sequence = i,
-                    // 客户布置图：两端各半个间距，设备之间为一个间距。
-                    // x_i = (2i - 1)L / (2FP)，例如 3 台为 L/6、L/2、5L/6。
-                    XAlongLengthM = input.LengthM * (2 * i - 1) / (2.0 * result.UnitCount),
-                    YFromReferenceEdgeM = input.PlacementOffsetM,
-                    AbsoluteElevationM = input.BaseElevationM + input.InstallationHeightM
-                });
-            }
+            result.PlacementPoints = placementPlanner.Build(
+                input.LengthM, input.WidthM, input.BaseElevationM,
+                input.InstallationHeightM, input.PlacementOffsetM, result.UnitCount);
 
             result.Success = true;
             result.ErrorCode = EquipmentSelectionErrorCode.None;

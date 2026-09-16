@@ -153,6 +153,27 @@ namespace FCUAutoDesign
                 .ToList();
         }
 
+        internal static XYZ GetRoomCenter(Document doc, Room room, XYZ axis)
+        {
+            if (doc == null || room == null || axis == null) return null;
+            IList<IList<BoundarySegment>> loops = room.GetBoundarySegments(new SpatialElementBoundaryOptions());
+            IList<BoundarySegment> outer = loops?.OrderByDescending(x => x.Sum(s => s.GetCurve().Length)).FirstOrDefault();
+            if (outer == null || outer.Count == 0) return null;
+            XYZ localAxis = new XYZ(axis.X, axis.Y, 0);
+            if (localAxis.GetLength() <= ToleranceFeet) return null;
+            localAxis = localAxis.Normalize();
+            XYZ perpendicular = XYZ.BasisZ.CrossProduct(localAxis).Normalize();
+            List<XYZ> points = outer.SelectMany(x => new[] { x.GetCurve().GetEndPoint(0), x.GetCurve().GetEndPoint(1) }).ToList();
+            if (points.Count == 0 || points.Any(x => Math.Abs(x.Z) > 1e6)) return null;
+            double minA = points.Min(x => x.DotProduct(localAxis));
+            double maxA = points.Max(x => x.DotProduct(localAxis));
+            double minB = points.Min(x => x.DotProduct(perpendicular));
+            double maxB = points.Max(x => x.DotProduct(perpendicular));
+            XYZ center = localAxis * ((minA + maxA) * 0.5) + perpendicular * ((minB + maxB) * 0.5);
+            XYZ test = new XYZ(center.X, center.Y, room.Level.Elevation + 1.0);
+            return room.IsPointInRoom(test) ? center : null;
+        }
+
         internal static bool BelongsToRoom(FamilyInstance door, Room room)
         {
             return door != null && room != null

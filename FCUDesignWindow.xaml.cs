@@ -7,6 +7,7 @@ namespace FCUAutoDesign
     public partial class FCUDesignWindow : Window
     {
         public double DoorOffsetMm { get; private set; } = 800;
+        public bool CenterPlacement { get; private set; } = true;
         public double FcuElevationMm { get; private set; } = 2600;
         public double ValveClearanceMm { get; private set; } = 400;
         public double? MinimumStraightLengthMm { get; private set; }
@@ -42,6 +43,7 @@ namespace FCUAutoDesign
             EnableAutoSizing = ChkAutoDn.IsChecked == true;
             EnableBusinessRulePreview = ChkBusinessPreview.IsChecked == true;
             EnableReturnPipe = ChkEnableReturn.IsChecked == true;
+            CenterPlacement = ChkCenterPlacement.IsChecked == true;
             EnableCondensate = ChkEnableCondensate.IsChecked == true;
             BreakCurveAndTee = ChkBreakCurve.IsChecked == true;
 
@@ -69,6 +71,7 @@ namespace FCUAutoDesign
             FcuElevationMm = fElev;
             ValveClearanceMm = vClear;
             MinimumStraightLengthMm = minimumStraight;
+            CenterPlacement = ChkCenterPlacement.IsChecked == true;
             FlipDropMm = fDrop;
             CoolingIndexWPerSquareMeter = coolingIndex;
             return true;

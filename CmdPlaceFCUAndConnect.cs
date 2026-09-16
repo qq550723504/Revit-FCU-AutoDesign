@@ -54,6 +54,7 @@ namespace FCUAutoDesign
                 {
                     SelectedFcuTypeId = uiWindow.SelectedFcuTypeId.Value,
                     DoorOffsetMm = uiWindow.DoorOffsetMm,
+                    CenterPlacement = uiWindow.CenterPlacement,
                     FcuElevationMm = uiWindow.FcuElevationMm,
                     ValveClearanceMm = uiWindow.ValveClearanceMm,
                     MinimumStraightLengthMm = uiWindow.MinimumStraightLengthMm,

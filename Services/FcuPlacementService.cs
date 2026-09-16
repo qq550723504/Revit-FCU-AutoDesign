@@ -61,6 +61,15 @@ namespace FCUAutoDesign
                     }
                 }
 
+                XYZ roomCenter = options.CenterPlacement
+                    ? RoomRuleSnapshotReader.GetRoomCenter(doc, room, wallDirection)
+                    : null;
+                if (roomCenter != null)
+                {
+                    candidatePt = roomCenter;
+                    // 中心布置不改变门侧朝向，只改变设备落点。
+                    testCheckPt = new XYZ(candidatePt.X, candidatePt.Y, baseLevelElev + 1.0);
+                }
                 placePoint = new XYZ(candidatePt.X, candidatePt.Y, fcuAbsoluteZ);
             }
 

@@ -58,6 +58,13 @@ try {
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Custom parameters accepted without slope setting'
     Assert-True ($window.DoorOffsetMm -eq 900) 'Custom distance preserved'
     Assert-True ($null -eq $window.MinimumStraightLengthMm) 'No fabricated engineering minimum'
+    Assert-True ($window.CenterPlacement) 'Room-center placement is enabled by default'
+    $window.FindName('ChkCenterPlacement').IsChecked = $false
+    Assert-True ([bool]$readParameters.Invoke($window, @())) 'Door-side placement override accepted'
+    Assert-True (-not $window.CenterPlacement) 'Door-side placement override preserved'
+    $window.FindName('ChkCenterPlacement').IsChecked = $true
+    Assert-True ([bool]$readParameters.Invoke($window, @())) 'Room-center placement can be restored'
+    Assert-True ($window.CenterPlacement) 'Room-center placement restored'
     foreach ($bad in '0', '-1', 'NaN', 'Infinity', '400', '450', 'abc') {
         $window.FindName('TxtMinimumStraight').Text = $bad
         Assert-True (-not [bool]$readParameters.Invoke($window, @())) "Invalid net minimum rejected: $bad"

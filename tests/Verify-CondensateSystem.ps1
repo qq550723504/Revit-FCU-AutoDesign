@@ -1,4 +1,4 @@
-﻿param([string]$AssemblyPath = (Join-Path $PSScriptRoot '..\bin\CondensateOrthogonalDetour\FCUAutoDesign.dll'))
+﻿param([string]$AssemblyPath = (Join-Path $PSScriptRoot '..\bin\Release\FCUAutoDesign.dll'))
 $ErrorActionPreference = 'Stop'
 [void][Reflection.Assembly]::LoadFrom('C:\Program Files\Autodesk\Revit 2020\RevitAPI.dll')
 $assembly = [Reflection.Assembly]::LoadFrom((Resolve-Path $AssemblyPath).Path)

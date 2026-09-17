@@ -1,4 +1,4 @@
-﻿param([string]$AssemblyPath = (Join-Path $PSScriptRoot '..\bin\CondensateOrthogonalDetour\FCUAutoDesign.dll'))
+﻿param([string]$AssemblyPath = (Join-Path $PSScriptRoot '..\bin\Release\FCUAutoDesign.dll'))
 
 # In-process WPF regression test; does not automate or modify a running Revit instance.
 # Run with Windows PowerShell: powershell.exe -NoProfile -STA -File tests\Verify-Dialog.ps1
@@ -48,6 +48,8 @@ try {
     Assert-True ($window.FindName('RbCreate').IsChecked -eq $true -and $window.FindName('RbRecalculate').IsChecked -eq $false) 'Create mode is the explicit default'
     Assert-True ($window.FindName('ChkAutomaticScope').IsChecked -eq $false -and -not $window.EnableAutomaticScopeDiscovery) 'Automatic scope discovery is explicit opt-in'
     Assert-True ($null -ne $window.FindName('BtnAgentPlan') -and $null -ne $window.FindName('TxtAgentRequest') -and $null -ne $window.FindName('BtnApplyAgentPlan')) 'AI plan controls are present'
+    Assert-True ($null -ne $window.FindName('TxtAgentBaseUrl') -and $null -ne $window.FindName('TxtAgentModel') -and $null -ne $window.FindName('PwdAgentApiKey')) 'In-app AI settings controls are present'
+    Assert-True ($null -ne $window.FindName('BtnSaveAgentSettings') -and $null -ne $window.FindName('BtnClearAgentSettings')) 'AI settings can be saved or cleared without a script'
     Assert-True ($window.FindName('BtnAgentPlan').Content -eq '生成方案') 'AI plan action uses the current product wording'
     Assert-True ($window.FindName('BtnApplyAgentPlan').Content -eq '应用方案') 'AI apply action uses consistent product wording'
     Assert-True ($window.FindName('BtnApplyAgentPlan').Visibility.ToString() -eq 'Collapsed') 'Agent apply action is explicit and hidden until a valid plan exists'

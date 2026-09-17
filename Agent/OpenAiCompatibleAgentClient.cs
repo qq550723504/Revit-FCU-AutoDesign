@@ -39,16 +39,19 @@ namespace FCUAutoDesign.Agent
             if (!TryBuildEndpoint(configuration, out endpoint, out configurationError))
                 return Result(AgentCallStatus.Unavailable, configurationError);
 
-            ChatCompletionRequest request = new ChatCompletionRequest
+            Dictionary<string, object> request = new Dictionary<string, object>
             {
-                model = configuration.Model.Trim(),
-                temperature = 0,
-                messages = new List<ChatMessage>
+                { "model", configuration.Model.Trim() },
+                { "temperature", 0 },
+                { "response_format", BuildResponseFormat() },
+                { "messages", new List<ChatMessage>
                 {
                     new ChatMessage { role = "system", content = prompts.SystemPrompt() },
                     new ChatMessage { role = "user", content = prompts.UserPrompt(context) }
-                }
+                } }
             };
+            if (endpoint.Host.EndsWith("aliyuncs.com", StringComparison.OrdinalIgnoreCase))
+                request["enable_thinking"] = false;
             using (HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Post, endpoint))
             {
                 if (!string.IsNullOrWhiteSpace(configuration.ApiKey))
@@ -156,12 +159,62 @@ namespace FCUAutoDesign.Agent
 
         public void Dispose() { http.Dispose(); }
 
-        private sealed class ChatCompletionRequest
+        private static object BuildResponseFormat()
         {
-            public string model { get; set; }
-            public double temperature { get; set; }
-            public IList<ChatMessage> messages { get; set; }
+            Dictionary<string, object> properties = new Dictionary<string, object>
+            {
+                { "schema_version", Field("integer", "const", 2) },
+                { "summary", Field("string") },
+                { "mode", Field("string", "enum", new[] { "diagnose", "create", "recalculate" }) },
+                { "room_name_keywords", StringArrayField() },
+                { "cooling_index_w_per_square_meter", NullableField("number") },
+                { "door_offset_mm", NullableField("number") },
+                { "fcu_elevation_mm", NullableField("number") },
+                { "enable_multiple_fcus", NullableField("boolean") },
+                { "enable_automatic_scope_discovery", NullableField("boolean") },
+                { "connect_supply", NullableField("boolean") },
+                { "connect_return", NullableField("boolean") },
+                { "connect_condensate", NullableField("boolean") },
+                { "clarifications", StringArrayField() },
+                { "observations", StringArrayField() },
+                { "warnings", StringArrayField() },
+                { "blocked_actions", StringArrayField() }
+            };
+            Dictionary<string, object> schema = new Dictionary<string, object>
+            {
+                { "type", "object" },
+                { "additionalProperties", false },
+                { "properties", properties },
+                { "required", new List<string>(properties.Keys) }
+            };
+            return new
+            {
+                type = "json_schema",
+                json_schema = new { name = "fcu_agent_plan_v2", strict = true, schema }
+            };
         }
+
+        private static Dictionary<string, object> Field(string type, string key = null, object value = null)
+        {
+            Dictionary<string, object> field = new Dictionary<string, object> { { "type", type } };
+            if (key != null) field[key] = value;
+            return field;
+        }
+
+        private static Dictionary<string, object> NullableField(string type)
+        {
+            return new Dictionary<string, object> { { "type", new[] { type, "null" } } };
+        }
+
+        private static Dictionary<string, object> StringArrayField()
+        {
+            return new Dictionary<string, object>
+            {
+                { "type", "array" },
+                { "items", new Dictionary<string, object> { { "type", "string" } } }
+            };
+        }
+
         private sealed class ChatMessage { public string role { get; set; } public string content { get; set; } }
         private sealed class ChatCompletionResponse { public IList<ChatChoice> choices { get; set; } }
         private sealed class ChatChoice { public ChatMessage message { get; set; } }

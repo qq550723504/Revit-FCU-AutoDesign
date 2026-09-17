@@ -128,9 +128,22 @@ namespace FCUAutoDesign.Agent
                     "Base URL maps to the compatible chat completions endpoint");
                 Check(handler.Authorization == null, "API key is optional for a local compatible endpoint");
                 Check(handler.RequestBody.Contains("compatible-model")
-                    && handler.RequestBody.Contains("explain failures"),
-                    "Request contains configured model and serialized user context");
+                    && handler.RequestBody.Contains("explain failures")
+                    && handler.RequestBody.Contains("json_schema")
+                    && handler.RequestBody.Contains("additionalProperties"),
+                    "Request contains model, runtime context and strict response schema");
             }
+
+            var promptBuilder = new AgentPromptBuilder();
+            string systemPrompt = promptBuilder.SystemPrompt();
+            string runtimePrompt = promptBuilder.UserPrompt(new AgentRequestContext());
+            Check(!systemPrompt.Contains("500m") && !systemPrompt.Contains("2.5m")
+                && !systemPrompt.Contains("enable_multiple_fcus"),
+                "System prompt contains stable role constraints rather than phrase-specific business rules");
+            Check(runtimePrompt.Contains("execution_contract")
+                && runtimePrompt.Contains("allowed_form_updates")
+                && runtimePrompt.Contains("request_context"),
+                "Runtime prompt carries capabilities, policy and current state as data");
 
             var invalidHandler = new FakeHandler { ResponseBody = Response("execute", 0) };
             using (var invalid = new OpenAiCompatibleAgentClient(new AgentConfiguration
@@ -173,6 +186,21 @@ namespace FCUAutoDesign.Agent
                     .GetAwaiter().GetResult();
                 Check(result.Status == AgentCallStatus.Unavailable && !unauthenticatedHandler.Called,
                     "Remote endpoint without API key never sends a network request");
+            }
+
+            var aliyunHandler = new FakeHandler { ResponseBody = Response("create", 200) };
+            using (var aliyun = new OpenAiCompatibleAgentClient(new AgentConfiguration
+            {
+                BaseUrl = AgentConfiguration.DefaultBaseUrl,
+                Model = AgentConfiguration.DefaultModel,
+                ApiKey = "test-token"
+            }, aliyunHandler))
+            {
+                var result = aliyun.CreatePlanAsync(new AgentRequestContext(), CancellationToken.None)
+                    .GetAwaiter().GetResult();
+                Check(result.Status == AgentCallStatus.Success
+                    && aliyunHandler.RequestBody.Contains("\"enable_thinking\":false"),
+                    "Aliyun intent extraction explicitly disables provider thinking mode");
             }
 
             var duplicate = new AgentPlan

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
+using FCUAutoDesign.Business.EquipmentSelection;
 using static FCUAutoDesign.RevitUnits;
 
 namespace FCUAutoDesign
@@ -34,8 +35,8 @@ namespace FCUAutoDesign
                 CapturedAtUtc = DateTime.UtcNow
             };
             List<FcuDesignResult> devices = design.Devices.ToList();
-            double designCoolingLoadKw = dimensions.LengthM * dimensions.WidthM
-                * options.CoolingIndexWPerSquareMeter / 1000.0;
+            double designCoolingLoadKw = RoomLoadCalculator.DesignLoadKilowatts(
+                dimensions.LengthM, dimensions.WidthM, options.CoolingIndexWPerSquareMeter);
             DesignRoomRecord roomRecord = new DesignRoomRecord
             {
                 RoomUniqueId = room.UniqueId,

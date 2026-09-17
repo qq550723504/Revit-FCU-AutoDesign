@@ -13,7 +13,7 @@ namespace FCUAutoDesign
         public double? MinimumStraightLengthMm { get; private set; }
         public double FlipDropMm { get; private set; } = 150;
         public double CoolingIndexWPerSquareMeter { get; private set; } = 200;
-        public bool EnableAutoSizing { get; private set; } = true;
+        public bool EnableAutoSizing { get; private set; } = false;
         public bool EnableBusinessRulePreview { get; private set; } = true;
         public bool EnableMultipleFcus { get; private set; } = true;
         public bool EnableReturnPipe { get; private set; } = true;

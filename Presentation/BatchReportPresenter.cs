@@ -26,7 +26,8 @@ namespace FCUAutoDesign
                     foreach (FcuDesignResult device in room.Design.Devices)
                     {
                         ExecutionOutcome o = device.Outcome;
-                        details.AppendLine($"FCU ID {o.FcuId.IntegerValue}；支管 DN{device.ActualDn}。");
+                        details.AppendLine($"FCU ID {o.FcuId.IntegerValue}；供水接口 DN{device.ActualDn}；"
+                            + "供水、回水、冷凝水支管分别采用各自设备接口尺寸。");
                         details.AppendLine($"供水：{(o.SupplyTeeConnected ? "已接主管" : o.SupplyBranchCreated ? "支管已生成，未接主管" : "未完成")}；"
                             + $"回水：{(!options.EnableReturnPipe ? "未启用" : o.ReturnTeeConnected ? "已接主管" : "未完成/已跳过")}；"
                             + $"冷凝水：{(!options.EnableCondensate ? "未启用" : o.CondensateConnected ? "已接主管" : "未完成")}。");

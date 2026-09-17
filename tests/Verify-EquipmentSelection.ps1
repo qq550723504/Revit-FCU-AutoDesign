@@ -2,9 +2,11 @@ $ErrorActionPreference = 'Stop'
 $modelSource = Get-Content (Join-Path $PSScriptRoot '..\Domain\EquipmentSelection\EquipmentSelectionModels.cs') -Raw -Encoding UTF8
 $calculatorSource = Get-Content (Join-Path $PSScriptRoot '..\Domain\EquipmentSelection\EquipmentSelectionCalculator.cs') -Raw -Encoding UTF8
 $plannerSource = Get-Content (Join-Path $PSScriptRoot '..\Domain\EquipmentSelection\EquipmentPlacementPlanner.cs') -Raw -Encoding UTF8
+$loadSource = Get-Content (Join-Path $PSScriptRoot '..\Domain\EquipmentSelection\RoomLoadCalculator.cs') -Raw -Encoding UTF8
 $modelSource = $modelSource -replace '(?m)^using\s+[^;]+;\s*', ''
 $calculatorSource = $calculatorSource -replace '(?m)^using\s+[^;]+;\s*', ''
 $plannerSource = $plannerSource -replace '(?m)^using\s+[^;]+;\s*', ''
+$loadSource = $loadSource -replace '(?m)^using\s+[^;]+;\s*', ''
 $checks = @'
 namespace FCUAutoDesign.Business.EquipmentSelection
 {
@@ -63,6 +65,8 @@ namespace FCUAutoDesign.Business.EquipmentSelection
             var e01 = Calculator.Calculate(Input(5, 5), Catalog);
             Check(e01.Success && e01.AreaSquareMeters == 25 && e01.DesignLoadKw == 5
                 && e01.UnitCount == 1 && e01.SelectedEquipment.ModelCode == "FP-102", "5x5 selects FP-102");
+            Check(RoomLoadCalculator.DesignLoadKilowatts(5, 5, 200) == 5,
+                "Shared room-load rule uses LxH and configured cooling index");
 
             var e02 = Calculator.Calculate(Input(6, 5), Catalog);
             Check(e02.Success && e02.UnitCount == 2 && e02.UnitDesignLoadKw == 3
@@ -132,5 +136,5 @@ namespace FCUAutoDesign.Business.EquipmentSelection
 }
 '@
 $imports = "using System;`r`nusing System.Collections.Generic;`r`nusing System.Linq;`r`n"
-Add-Type -TypeDefinition ($imports + $modelSource + [Environment]::NewLine + $plannerSource + [Environment]::NewLine + $calculatorSource + [Environment]::NewLine + $checks)
+Add-Type -TypeDefinition ($imports + $modelSource + [Environment]::NewLine + $plannerSource + [Environment]::NewLine + $loadSource + [Environment]::NewLine + $calculatorSource + [Environment]::NewLine + $checks)
 [FCUAutoDesign.Business.EquipmentSelection.EquipmentSelectionChecks]::Run()

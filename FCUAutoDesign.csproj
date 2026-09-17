@@ -111,6 +111,7 @@
     <Compile Include="Domain\EquipmentSelection\EquipmentSelectionModels.cs" />
     <Compile Include="Domain\EquipmentSelection\EquipmentPlacementPlanner.cs" />
     <Compile Include="Domain\EquipmentSelection\EquipmentSelectionCalculator.cs" />
+    <Compile Include="Domain\EquipmentSelection\RoomLoadCalculator.cs" />
     <Compile Include="Business\EquipmentCatalog\EquipmentCatalogMapping.cs" />
     <Compile Include="Business\Hydraulic\HydraulicTable.cs" />
     <Compile Include="Business\DesignReconciliation\DesignReconciliation.cs" />

@@ -69,6 +69,13 @@ namespace FCUAutoDesign
                     EnableAutomaticScopeDiscovery = uiWindow.EnableAutomaticScopeDiscovery,
                     AutomaticRoomNameKeywords = uiWindow.AutomaticRoomNameKeywords
                 };
+                if (options.CoolingIndexWPerSquareMeter <= 0)
+                {
+                    TaskDialog.Show("零负荷未启用",
+                        "冷指标为 0 的输入本身有效，但零负荷房间是否放置设备尚未确认。"
+                        + Environment.NewLine + "本次未读取房间、未放置设备、未修改管线。");
+                    return Result.Cancelled;
+                }
 
                 // =========================================================================
                 // 1. 引导用户拾取目标房间与走廊供水水平主管

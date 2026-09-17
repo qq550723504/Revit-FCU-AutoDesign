@@ -16,8 +16,8 @@ namespace FCUAutoDesign
         {
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("【FCU 自动化执行核查报告】");
-            sb.AppendLine($"1. 房间面积: {roomAreaSqm:F1} ㎡ | 估算冷负荷: {coolingLoadKw:F2} kW");
-            sb.AppendLine($"2. 支管管径: DN{dn} (选型模式: {(autoSizing ? "面积分档，未做水力计算" : "固定设定")})");
+            sb.AppendLine($"1. 规则面积 L×H: {roomAreaSqm:F1} ㎡ | 设计冷负荷: {coolingLoadKw:F2} kW");
+            sb.AppendLine($"2. 供水接口管径: DN{dn}（支管采用各回路设备实际接口尺寸；正式自动选径未启用）");
             sb.AppendLine($"3. 空间布设: {(outcome.PlacementVerified ? "【正常】标高叠加基准，室内落点校验通过" : "【警告】未通过落点校验")}");
 
             // 供水状态

@@ -46,6 +46,7 @@ try {
     Assert-True ($window.FindName('ChkMultipleFcus').IsChecked -eq $true -and $window.EnableMultipleFcus) 'Multi-FCU placement enabled by default'
     Assert-True ($window.FindName('ChkAutomaticScope').IsChecked -eq $false -and -not $window.EnableAutomaticScopeDiscovery) 'Automatic scope discovery is explicit opt-in'
     Assert-True ($window.FindName('TxtAutomaticRoomKeywords').Text -eq '会议室;办公室') 'Target room keywords have an explicit editable default'
+    Assert-True ($window.FindName('ChkAutoDn').IsEnabled -eq $false -and $window.FindName('ChkAutoDn').IsChecked -eq $false -and -not $window.EnableAutoSizing) 'Unconfirmed hydraulic auto-sizing is disabled'
     Assert-True ($null -eq $window.FindName('TxtCondensateSlope')) 'No condensate slope input exists'
     $window.FindName('ChkEnableCondensate').IsChecked = $true
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Enabled condensate needs no slope setting'

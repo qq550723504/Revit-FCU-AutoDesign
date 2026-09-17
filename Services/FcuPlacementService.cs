@@ -15,9 +15,8 @@ namespace FCUAutoDesign
         // 调用方必须已开启主事务；此服务不提交主事务。
         public IList<XYZ> PlanPoints(Document doc, Room room, FcuDesignOptions options)
         {
-            FamilyInstance door = FindDoorForRoom(doc, room, options);
-            RoomRuleSnapshot snapshot = new RoomRuleSnapshotReader().Read(doc, room, door);
-            if (!snapshot.IsValid) throw new InvalidOperationException(snapshot.ErrorMessage);
+            FamilyInstance door;
+            RoomRuleSnapshot snapshot = ReadRuleSnapshot(doc, room, options, out door);
             Wall wall = door.Host as Wall;
             XYZ center = RoomRuleSnapshotReader.GetDoorWallOffsetCenter(doc, room, wall, options.DoorOffsetMm);
             if (center == null) throw new InvalidOperationException("无法确定距门侧墙的合法布置基线。未放置设备。");
@@ -34,6 +33,21 @@ namespace FCUAutoDesign
             if (points.Any(p => !room.IsPointInRoom(p)))
                 throw new InvalidOperationException("至少一个多台 FCU 落点不在房间体积内；整间未放置，请检查边界、内缩距离和标高。");
             return points;
+        }
+
+        public RoomRuleSnapshot ReadRuleSnapshot(Document doc, Room room, FcuDesignOptions options)
+        {
+            FamilyInstance ignored;
+            return ReadRuleSnapshot(doc, room, options, out ignored);
+        }
+
+        private RoomRuleSnapshot ReadRuleSnapshot(Document doc, Room room, FcuDesignOptions options,
+            out FamilyInstance door)
+        {
+            door = FindDoorForRoom(doc, room, options);
+            RoomRuleSnapshot snapshot = new RoomRuleSnapshotReader().Read(doc, room, door);
+            if (!snapshot.IsValid) throw new InvalidOperationException(snapshot.ErrorMessage);
+            return snapshot;
         }
 
         public FcuPlacementResult Place(Document doc, Room room, FcuDesignOptions options, XYZ plannedPoint = null)

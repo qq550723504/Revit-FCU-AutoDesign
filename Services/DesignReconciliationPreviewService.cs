@@ -7,6 +7,7 @@ using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.UI;
 using FCUAutoDesign.Business.DesignReconciliation;
+using FCUAutoDesign.Business.EquipmentSelection;
 using static FCUAutoDesign.RevitUnits;
 
 namespace FCUAutoDesign
@@ -293,7 +294,8 @@ namespace FCUAutoDesign
             FamilySymbol symbol = doc.GetElement(new ElementId(options.SelectedFcuTypeId)) as FamilySymbol;
             if (symbol == null) throw new InvalidOperationException("所选 FCU 族类型已不存在。");
             List<DesignDeviceRecord> ordered = baseline.Devices.OrderBy(x => x.LogicalDeviceId, StringComparer.Ordinal).ToList();
-            double load = dimensions.LengthM * dimensions.WidthM * options.CoolingIndexWPerSquareMeter / 1000.0;
+            double load = RoomLoadCalculator.DesignLoadKilowatts(
+                dimensions.LengthM, dimensions.WidthM, options.CoolingIndexWPerSquareMeter);
             DesignRoomRecord desiredRoom = CopyRoom(baselineRoom);
             desiredRoom.RoomNumber = room.Number ?? string.Empty;
             desiredRoom.RoomName = room.Name ?? string.Empty;

@@ -3,6 +3,7 @@ using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.DB.Plumbing;
+using FCUAutoDesign.Business.EquipmentSelection;
 using static FCUAutoDesign.RevitUnits;
 
 namespace FCUAutoDesign
@@ -28,15 +29,19 @@ namespace FCUAutoDesign
             if (existing.Status != DesignOperationStatus.NotFound)
                 throw new InvalidOperationException("读取房间设计记录失败，未修改模型：" + existing.Message);
             string designId = Guid.NewGuid().ToString("N");
+            RoomRuleSnapshot rule = placement.ReadRuleSnapshot(doc, room, options);
+            double designAreaSqm = RoomLoadCalculator.AreaSquareMeters(rule.LengthM, rule.WidthM);
+            double totalCoolingLoadKw = RoomLoadCalculator.DesignLoadKilowatts(
+                rule.LengthM, rule.WidthM, options.CoolingIndexWPerSquareMeter);
             if (!options.EnableMultipleFcus)
                 return ExecuteSingle(doc, room, supplyMainPipe, returnMainPipe, condensateMainPipe,
-                    options, batch, null, true, designId);
+                    options, batch, designAreaSqm, totalCoolingLoadKw, null, true, designId);
             var points = placement.PlanPoints(doc, room, options);
             if (points.Count == 1)
                 return ExecuteSingle(doc, room, supplyMainPipe, returnMainPipe, condensateMainPipe,
-                    options, batch, points[0], true, designId);
+                    options, batch, designAreaSqm, totalCoolingLoadKw, points[0], true, designId);
             RoomBatchContext working = (batch ?? new RoomBatchContext(supplyMainPipe, returnMainPipe, condensateMainPipe)).Fork();
-            var result = new FcuDesignResult { RoomAreaSqm = room.Area * SQFT_TO_SQM };
+            var result = new FcuDesignResult { RoomAreaSqm = designAreaSqm, CoolingLoadKw = totalCoolingLoadKw };
             using (TransactionGroup roomGroup = new TransactionGroup(doc, "同房间多台 FCU"))
             {
                 roomGroup.Start();
@@ -44,7 +49,7 @@ namespace FCUAutoDesign
                 {
                     FcuDesignResult unit = ExecuteSingle(doc, room, working.Supply.AnySegment(doc),
                         working.Return?.AnySegment(doc), working.Condensate?.AnySegment(doc), options,
-                        working, points[i], false, designId);
+                        working, designAreaSqm, totalCoolingLoadKw / points.Count, points[i], false, designId);
                     ExecutionOutcome o = unit.Outcome;
                     bool connected = o.SupplyBranchCreated && (!options.BreakCurveAndTee || o.SupplyTeeConnected)
                         && (!options.EnableReturnPipe || (o.ReturnBranchCreated && (!options.BreakCurveAndTee || o.ReturnTeeConnected)))
@@ -52,7 +57,7 @@ namespace FCUAutoDesign
                     if (!connected)
                         throw new InvalidOperationException($"第 {i + 1}/{points.Count} 台接管未完成，已回滚本房间全部新设备及管线。"
                             + Environment.NewLine + string.Join(Environment.NewLine, o.Warnings));
-                    o.Warnings.Add($"同房间第 {i + 1}/{points.Count} 台；沿门侧墙等分布置，使用用户指定族类型，未验证目录容量映射。支管仍采用现有 PoC 管径设置。");
+                    o.Warnings.Add($"同房间第 {i + 1}/{points.Count} 台；沿门侧墙等分布置，使用用户指定族类型，未验证目录容量映射。支管采用设备实际接口尺寸。");
                     working.Register(unit);
                     result.UnitResults.Add(unit);
                 }
@@ -70,7 +75,6 @@ namespace FCUAutoDesign
                     ConnectionInstallationVerifier.Verify(doc, unit.DrainConnection);
                 }
                 result.ActualDn = result.UnitResults[0].ActualDn;
-                result.CoolingLoadKw = result.UnitResults[0].CoolingLoadKw;
                 PersistRecord(doc, room, result, options, designId);
                 if (roomGroup.Assimilate() != TransactionStatus.Committed)
                     throw new InvalidOperationException("多台 FCU 房间事务组未提交。");
@@ -80,17 +84,11 @@ namespace FCUAutoDesign
 
         private FcuDesignResult ExecuteSingle(Document doc, Room room, Pipe supplyMainPipe,
             Pipe returnMainPipe, Pipe condensateMainPipe, FcuDesignOptions options,
-            RoomBatchContext batch, XYZ plannedPoint = null, bool persistRecord = false,
+            RoomBatchContext batch, double designAreaSqm, double unitCoolingLoadKw,
+            XYZ plannedPoint = null, bool persistRecord = false,
             string designId = null)
         {
-            double roomAreaSqm = room.Area * SQFT_TO_SQM;
-            double coolingLoadKw = roomAreaSqm * 0.160; // 160 W/m² 指标估算
-            int actualDn = 20;
-            if (options.EnableAutoSizing)
-            {
-                actualDn = (roomAreaSqm < 25.0) ? 20 : 25; // <25㎡ 选 DN20，≥25㎡ 选 DN25
-            }
-            double branchDiameterFeet = actualDn * MM_TO_FEET;
+            int actualDn = 0;
             PipeSystemType condensateType = PipeSystemType.Sanitary;
             if (options.EnableCondensate)
             {
@@ -144,6 +142,9 @@ namespace FCUAutoDesign
                     if (options.EnableCondensate && conns.CondensateConnector == null)
                         outcome.Warnings.Add($"FCU 没有匹配的 {condensateType} 管道端接口，未生成冷凝水管。"
                             + "设备实际接口：" + connectors.DescribeConnectors(fcu));
+                    double supplyDiameterFeet = ConnectorDiameter(conns.SupplyConnector, "供水");
+                    actualDn = NominalDiameterMm(supplyDiameterFeet);
+                    outcome.Warnings.Add("供回水及冷凝水支管分别采用设备实际圆形接口尺寸；未执行正式自动选径。");
 
                     // 步骤 C: 供水支管下翻避让并接入主管（含 SubTransaction 保护）
                     if (conns.SupplyConnector != null && supplyMainPipe != null)
@@ -152,7 +153,7 @@ namespace FCUAutoDesign
                             doc,
                             conns.SupplyConnector,
                             supplyMainPipe,
-                            branchDiameterFeet,
+                            supplyDiameterFeet,
                             options.FlipDropMm * MM_TO_FEET,
                             options.ValveClearanceMm * MM_TO_FEET,
                             options.BreakCurveAndTee, failureReporter, null, batch?.Supply, batch, "供水",
@@ -172,11 +173,12 @@ namespace FCUAutoDesign
                     // 步骤 D: 回水支管下翻避让并接入回水主管
                     if (options.EnableReturnPipe && returnMainPipe != null && conns.ReturnConnector != null)
                     {
+                        double returnDiameterFeet = ConnectorDiameter(conns.ReturnConnector, "回水");
                         TeeConnectionResult returnRes = separation.ConnectReturn(
                             doc,
                             conns.ReturnConnector,
                             returnMainPipe,
-                            branchDiameterFeet,
+                            returnDiameterFeet,
                             options.FlipDropMm * MM_TO_FEET,
                             options.ValveClearanceMm * MM_TO_FEET,
                             options.BreakCurveAndTee, failureReporter, supplyResult, batch?.Return, batch,
@@ -196,9 +198,10 @@ namespace FCUAutoDesign
                     conns = connectors.DetectFCUConnectors(doc.GetElement(outcome.FcuId) as FamilyInstance, condensateType);
                     if (options.EnableCondensate && conns.CondensateConnector != null)
                     {
+                        double condensateDiameterFeet = ConnectorDiameter(conns.CondensateConnector, "冷凝水");
                         drainResult = condensate.Connect(
                             doc, conns.CondensateConnector, condensateMainPipe, room.Level.Id,
-                            20 * MM_TO_FEET,
+                            condensateDiameterFeet,
                             failureReporter, supplyResult, returnResult, batch?.Condensate, batch,
                             options.ValveClearanceMm * MM_TO_FEET,
                             options.FlipDropMm * MM_TO_FEET, options.MinimumStraightLengthMm * MM_TO_FEET);
@@ -238,8 +241,8 @@ namespace FCUAutoDesign
                 batch?.VerifyPrevious(doc, supplyResult, returnResult, drainResult?.Connected == true ? drainResult.Connection : null);
                 designResult = new FcuDesignResult
                 {
-                    Outcome = outcome, ExpectedOutletDirection = expectedOutletDirection, RoomAreaSqm = roomAreaSqm,
-                    CoolingLoadKw = coolingLoadKw, ActualDn = actualDn,
+                    Outcome = outcome, ExpectedOutletDirection = expectedOutletDirection, RoomAreaSqm = designAreaSqm,
+                    CoolingLoadKw = unitCoolingLoadKw, ActualDn = actualDn,
                     SupplyConnection = supplyResult, ReturnConnection = returnResult,
                     DrainConnection = drainResult?.Connected == true ? drainResult.Connection : null,
                     SupplyNetworkId = batch?.Supply.NetworkId ?? (supplyMainPipe == null ? null : "main:" + supplyMainPipe.UniqueId),
@@ -256,6 +259,20 @@ namespace FCUAutoDesign
             }
 
             return designResult;
+        }
+
+        private static double ConnectorDiameter(Connector connector, string role)
+        {
+            if (connector == null || connector.Shape != ConnectorProfileType.Round
+                || connector.Radius <= 0 || double.IsNaN(connector.Radius)
+                || double.IsInfinity(connector.Radius))
+                throw new InvalidOperationException(role + "接口必须是具有有效尺寸的圆形管道接口。未生成支管。");
+            return connector.Radius * 2.0;
+        }
+
+        private static int NominalDiameterMm(double diameterFeet)
+        {
+            return (int)Math.Round(diameterFeet * FEET_TO_MM, MidpointRounding.AwayFromZero);
         }
 
         private static void PersistRecord(Document doc, Room room, FcuDesignResult result,

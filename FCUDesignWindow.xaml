@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="FCU 同楼层多房间放置与接管 PoC"
-        Height="610" Width="440"
+        Height="720" Width="520"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#0f172a" Foreground="#f8fafc"
@@ -24,6 +24,18 @@
         <Border Grid.Row="1" Background="#1e293b" CornerRadius="8" Padding="14" BorderBrush="#334155" BorderThickness="1">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
+                    <Border BorderBrush="#0e7490" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,14" Background="#13263a">
+                        <StackPanel>
+                            <TextBlock Text="Agent 只读方案助手" Foreground="#67e8f9" FontWeight="Bold" FontSize="12"/>
+                            <TextBlock Text="描述目标后生成建议。Agent 不能选择模型元素或修改 Revit；确认后仅回填模式、房间关键词和冷指标。" TextWrapping="Wrap" Foreground="#94a3b8" FontSize="11" Margin="0,3,0,7"/>
+                            <TextBox x:Name="TxtAgentRequest" MinHeight="54" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxLength="4000" Background="#0f172a" Foreground="#e2e8f0" BorderBrush="#475569" Padding="5"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                                <Button x:Name="BtnAgentPlan" Content="生成只读建议" Width="110" Height="28" Background="#0e7490" Foreground="White" BorderThickness="0" Click="BtnAgentPlan_Click"/>
+                                <TextBlock x:Name="TxtAgentStatus" Text="尚未生成" VerticalAlignment="Center" Foreground="#94a3b8" FontSize="11" Margin="10,0,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <TextBox x:Name="TxtAgentPreview" IsReadOnly="True" Visibility="Collapsed" MaxHeight="130" Margin="0,7,0,0" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Background="#0f172a" Foreground="#cbd5e1" BorderBrush="#334155" Padding="5"/>
+                        </StackPanel>
+                    </Border>
                     <TextBlock Text="操作模式：" Foreground="#cbd5e1" FontSize="12" Margin="0,0,0,5"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <RadioButton x:Name="RbCreate" GroupName="OperationMode" Content="首次生成" IsChecked="True" Foreground="#67e8f9" Margin="0,0,20,0"/>

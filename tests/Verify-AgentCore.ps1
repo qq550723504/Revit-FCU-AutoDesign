@@ -1,3 +1,5 @@
+param([switch]$Live)
+
 $ErrorActionPreference = 'Stop'
 $root = Join-Path $PSScriptRoot '..'
 $files = @(
@@ -174,14 +176,37 @@ namespace FCUAutoDesign.Agent
             };
             Check(!new AgentPlanValidator().Validate(duplicate).IsValid,
                 "Duplicate plan values are rejected deterministically");
-            Console.WriteLine(count + " agent core checks passed. External model calls and Revit writes are NOT_RUN.");
+            Console.WriteLine(count + " local agent core checks passed. Revit writes are NOT_RUN.");
+        }
+
+        public static void RunLive()
+        {
+            using (var client = new OpenAiCompatibleAgentClient(AgentConfiguration.FromEnvironment()))
+            {
+                var result = client.CreatePlanAsync(new AgentRequestContext
+                {
+                    UserRequest = "Generate a read-only plan. Keep create mode and cooling index 200.",
+                    CurrentMode = FcuOperationMode.Create,
+                    CurrentRoomNameKeywords = new List<string> { "meeting room", "office" },
+                    CoolingIndexWPerSquareMeter = 200
+                }, CancellationToken.None).GetAwaiter().GetResult();
+                bool valid = result.Validation != null && result.Validation.IsValid;
+                Console.WriteLine("LIVE status=" + result.Status + "; validated=" + valid
+                    + "; mode=" + (result.Validation == null ? "none" : result.Validation.Mode.ToString()));
+                if (result.Status != AgentCallStatus.Success || !valid)
+                    throw new Exception("Live Agent contract check failed: " + result.Message);
+            }
         }
     }
 }
 
 public static class Program
 {
-    public static void Main() { FCUAutoDesign.Agent.AgentCoreChecks.Run(); }
+    public static void Main(string[] args)
+    {
+        FCUAutoDesign.Agent.AgentCoreChecks.Run();
+        if (args.Length > 0 && args[0] == "--live") FCUAutoDesign.Agent.AgentCoreChecks.RunLive();
+    }
 }
 '@
 $imports = @'
@@ -211,5 +236,12 @@ $framework = 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.N
     "/reference:$framework\System.Net.Http.dll" `
     "/reference:$framework\System.Web.Extensions.dll" $testSource
 if ($LASTEXITCODE -ne 0) { throw 'Agent core harness compilation failed.' }
-& $exe
+$originalProcessKey = $env:FCU_AGENT_API_KEY
+if ($Live) {
+    $env:FCU_AGENT_API_KEY = [Environment]::GetEnvironmentVariable('FCU_AGENT_API_KEY', 'User')
+    & $exe --live
+} else {
+    & $exe
+}
+$env:FCU_AGENT_API_KEY = $originalProcessKey
 if ($LASTEXITCODE -ne 0) { throw 'Agent core regression failed.' }

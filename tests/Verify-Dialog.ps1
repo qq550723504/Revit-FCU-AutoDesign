@@ -7,6 +7,7 @@ if ([Threading.Thread]::CurrentThread.ApartmentState -ne 'STA') { throw 'Run wit
 Add-Type -AssemblyName PresentationFramework
 [void][Reflection.Assembly]::LoadFrom((Resolve-Path $AssemblyPath).Path)
 $readParameters = [FCUAutoDesign.FCUDesignWindow].GetMethod('TryReadParameters', [Reflection.BindingFlags]'NonPublic,Instance')
+$applyAgentPlan = [FCUAutoDesign.FCUDesignWindow].GetMethod('ApplyAgentPlan', [Reflection.BindingFlags]'NonPublic,Instance')
 $script:checks = 0
 
 function Assert-True([bool]$Condition, [string]$Name) {
@@ -46,6 +47,7 @@ try {
     Assert-True ($window.FindName('ChkMultipleFcus').IsChecked -eq $true -and $window.EnableMultipleFcus) 'Multi-FCU placement enabled by default'
     Assert-True ($window.FindName('RbCreate').IsChecked -eq $true -and $window.FindName('RbRecalculate').IsChecked -eq $false) 'Create mode is the explicit default'
     Assert-True ($window.FindName('ChkAutomaticScope').IsChecked -eq $false -and -not $window.EnableAutomaticScopeDiscovery) 'Automatic scope discovery is explicit opt-in'
+    Assert-True ($null -ne $window.FindName('BtnAgentPlan') -and $null -ne $window.FindName('TxtAgentRequest')) 'Read-only Agent controls are present'
     Assert-True ($window.FindName('TxtAutomaticRoomKeywords').Text -eq '会议室;办公室') 'Target room keywords have an explicit editable default'
     Assert-True ($window.FindName('ChkAutoDn').IsEnabled -eq $false -and $window.FindName('ChkAutoDn').IsChecked -eq $false -and -not $window.EnableAutoSizing) 'Unconfirmed hydraulic auto-sizing is disabled'
     Assert-True ($null -eq $window.FindName('TxtCondensateSlope')) 'No condensate slope input exists'
@@ -82,6 +84,18 @@ try {
     Assert-True (-not [bool]$readParameters.Invoke($window, @())) 'Automatic discovery rejects an empty room keyword set'
     $window.FindName('TxtAutomaticRoomKeywords').Text = '会议室;办公室'
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Automatic discovery accepts configured room keywords'
+
+    $plan = New-Object FCUAutoDesign.Agent.AgentPlan
+    $plan.schema_version = 1
+    $plan.summary = 'Adjust the form only'
+    $plan.mode = 'recalculate'
+    $plan.room_name_keywords = [System.Collections.Generic.List[string]]@('会议室','办公室')
+    $plan.cooling_index_w_per_square_meter = 215
+    $applyArguments = [object[]]@($plan.PSObject.BaseObject, [FCUAutoDesign.Agent.AgentPlanMode]::Recalculate)
+    $applyAgentPlan.Invoke($window, $applyArguments)
+    Assert-True ($window.FindName('RbRecalculate').IsChecked -eq $true) 'Confirmed Agent plan can update operation mode'
+    Assert-True ($window.FindName('ChkAutomaticScope').IsChecked -eq $true -and $window.FindName('TxtAutomaticRoomKeywords').Text -eq '会议室;办公室') 'Confirmed Agent plan can update room scope inputs'
+    Assert-True ($window.FindName('TxtCoolingIndex').Text -eq '215' -and -not $window.IsConfirmed) 'Agent form update does not execute or confirm the Revit command'
 } finally { $window.Close() }
 $window = New-TestWindow
 $window.Add_ContentRendered({

@@ -49,6 +49,7 @@ try {
     Assert-True ($window.FindName('ChkAutomaticScope').IsChecked -eq $false -and -not $window.EnableAutomaticScopeDiscovery) 'Automatic scope discovery is explicit opt-in'
     Assert-True ($null -ne $window.FindName('BtnAgentPlan') -and $null -ne $window.FindName('TxtAgentRequest') -and $null -ne $window.FindName('BtnApplyAgentPlan')) 'AI plan controls are present'
     Assert-True ($window.FindName('BtnAgentPlan').Content -eq '生成方案') 'AI plan action uses the current product wording'
+    Assert-True ($window.FindName('BtnApplyAgentPlan').Content -eq '应用方案') 'AI apply action uses consistent product wording'
     Assert-True ($window.FindName('BtnApplyAgentPlan').Visibility.ToString() -eq 'Collapsed') 'Agent apply action is explicit and hidden until a valid plan exists'
     Assert-True ($window.FindName('TxtAutomaticRoomKeywords').Text -eq '会议室;办公室') 'Target room keywords have an explicit editable default'
     Assert-True ($window.FindName('ChkAutoDn').IsEnabled -eq $false -and $window.FindName('ChkAutoDn').IsChecked -eq $false -and -not $window.EnableAutoSizing) 'Unconfirmed hydraulic auto-sizing is disabled'
@@ -115,6 +116,12 @@ try {
     $clarificationPlan.clarifications = [System.Collections.Generic.List[string]]@('500m or 500mm?')
     $clarificationArguments = [object[]]@($clarificationPlan.PSObject.BaseObject, [FCUAutoDesign.Agent.AgentPlanMode]::Create)
     Assert-True (-not [bool]$applyAgentPlan.Invoke($window, $clarificationArguments)) 'Plan requiring clarification cannot update the form'
+    $diagnosticPlan = New-Object FCUAutoDesign.Agent.AgentPlan
+    $diagnosticPlan.schema_version = 2
+    $diagnosticPlan.summary = 'Diagnosis only'
+    $diagnosticPlan.mode = 'diagnose'
+    $diagnosticArguments = [object[]]@($diagnosticPlan.PSObject.BaseObject, [FCUAutoDesign.Agent.AgentPlanMode]::Diagnose)
+    Assert-True (-not [bool]$applyAgentPlan.Invoke($window, $diagnosticArguments)) 'Diagnostic plan cannot update the form'
 } finally { $window.Close() }
 $window = New-TestWindow
 $window.Add_ContentRendered({

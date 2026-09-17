@@ -64,20 +64,20 @@ namespace FCUAutoDesign.Agent
                     {
                         string body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                         if (body.Length > MaxResponseCharacters)
-                            return Result(AgentCallStatus.InvalidResponse, "Agent 响应超过长度限制。");
+                            return Result(AgentCallStatus.InvalidResponse, "AI 响应超过长度限制。");
                         if (!response.IsSuccessStatusCode)
                             return Result(AgentCallStatus.TransportFailure,
-                                "Agent 接口返回 HTTP " + (int)response.StatusCode + "。未生成计划。");
+                                "AI 接口返回 HTTP " + (int)response.StatusCode + "。未生成方案。");
                         return Parse(body);
                     }
                 }
                 catch (OperationCanceledException)
                 {
-                    return Result(AgentCallStatus.TransportFailure, "Agent 请求已取消或超时。");
+                    return Result(AgentCallStatus.TransportFailure, "AI 请求已取消或超时。");
                 }
                 catch (HttpRequestException ex)
                 {
-                    return Result(AgentCallStatus.TransportFailure, "Agent 接口不可用：" + ex.Message);
+                    return Result(AgentCallStatus.TransportFailure, "AI 接口不可用：" + ex.Message);
                 }
             }
         }
@@ -90,7 +90,7 @@ namespace FCUAutoDesign.Agent
                 string content = response?.choices != null && response.choices.Count > 0
                     ? response.choices[0]?.message?.content : null;
                 if (string.IsNullOrWhiteSpace(content))
-                    return Result(AgentCallStatus.InvalidResponse, "Agent 响应没有计划内容。");
+                    return Result(AgentCallStatus.InvalidResponse, "AI 响应没有方案内容。");
                 AgentPlan plan = serializer.Deserialize<AgentPlan>(content.Trim());
                 AgentPlanValidationResult validation = validator.Validate(plan);
                 if (!validation.IsValid)
@@ -111,11 +111,11 @@ namespace FCUAutoDesign.Agent
             }
             catch (InvalidOperationException)
             {
-                return Result(AgentCallStatus.InvalidResponse, "Agent 返回内容不是有效的兼容 JSON 计划。");
+                return Result(AgentCallStatus.InvalidResponse, "AI 返回内容不是有效的兼容 JSON 方案。");
             }
             catch (ArgumentException)
             {
-                return Result(AgentCallStatus.InvalidResponse, "Agent 返回内容不是有效的兼容 JSON 计划。");
+                return Result(AgentCallStatus.InvalidResponse, "AI 返回内容不是有效的兼容 JSON 方案。");
             }
         }
 
@@ -126,24 +126,24 @@ namespace FCUAutoDesign.Agent
             if (value == null || string.IsNullOrWhiteSpace(value.BaseUrl)
                 || string.IsNullOrWhiteSpace(value.Model))
             {
-                error = "Agent 尚未配置 Base URL 和模型；未发送网络请求。";
+                error = "AI 尚未配置 Base URL 和模型；未发送网络请求。";
                 return false;
             }
             Uri baseUri;
             if (!Uri.TryCreate(value.BaseUrl.Trim(), UriKind.Absolute, out baseUri))
             {
-                error = "Agent Base URL 无效；未发送网络请求。";
+                error = "AI Base URL 无效；未发送网络请求。";
                 return false;
             }
             bool loopback = baseUri.IsLoopback;
             if (!loopback && !string.Equals(baseUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
             {
-                error = "远程 Agent 接口必须使用 HTTPS。";
+                error = "远程 AI 接口必须使用 HTTPS。";
                 return false;
             }
             if (!loopback && string.IsNullOrWhiteSpace(value.ApiKey))
             {
-                error = "远程 Agent 接口尚未配置 API Key；未发送网络请求。";
+                error = "远程 AI 接口尚未配置 API Key；未发送网络请求。";
                 return false;
             }
             string absolute = baseUri.AbsoluteUri.TrimEnd('/');

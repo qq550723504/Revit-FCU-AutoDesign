@@ -52,6 +52,7 @@ msbuild FCUAutoDesign.csproj /p:RevitVersion=2022 /p:RevitInstallPath="C:\Progra
 - `Presentation/ExecutionReportPresenter.cs`：执行结果报告
 - `FCUDesignWindow.xaml`：参数配置界面
 - `FCUDesignWindow.xaml.cs`：界面逻辑
+- `Agent/`：AI 参数方案的提示词、严格输出契约、兼容接口客户端与本地校验；只回填表单，不直接调用 Revit API
 - `FCUAutoDesign.addin`：Revit 插件加载配置
 - `FCUAutoDesign.csproj`：项目文件
 
@@ -59,6 +60,23 @@ msbuild FCUAutoDesign.csproj /p:RevitVersion=2022 /p:RevitInstallPath="C:\Progra
 主事务仅由 `FcuDesignService` 提交，提交后的位置、朝向与连接链复核仍在事务组内，失败时整组回滚。
 三通和冷凝水服务保留局部子事务，其他服务不自行开启或提交主事务。
 这些类保留在同一个程序集；新增源文件需加入项目文件的 `Compile` 列表。
+
+## AI 方案助手配置
+
+AI 方案助手通过 OpenAI 兼容的 Chat Completions 接口生成候选参数方案。API Key 不写入仓库或 DLL，使用当前 Windows 用户环境变量：
+
+```powershell
+setx FCU_AGENT_API_KEY "替换为客户自己的密钥"
+```
+
+可选覆盖接口地址和模型：
+
+```powershell
+setx FCU_AGENT_BASE_URL "https://example.com/v1"
+setx FCU_AGENT_MODEL "兼容模型名称"
+```
+
+设置后需完全退出并重新启动 Revit。AI 输出必须先通过严格 JSON 架构和本地契约校验，用户点击“应用方案”后只会回填窗口；点击“开始放置与接管”后才进入现有 Revit 事务。不要把真实 API Key 写入配置文件、截图或客户测试包。
 
 ## 编译建议
 

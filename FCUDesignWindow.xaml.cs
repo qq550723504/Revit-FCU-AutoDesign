@@ -12,6 +12,8 @@ namespace FCUAutoDesign
 {
     public partial class FCUDesignWindow : Window
     {
+        private AgentPlan pendingAgentPlan;
+        private AgentPlanMode pendingAgentMode;
         public double DoorOffsetMm { get; private set; } = 500;
         public double FcuElevationMm { get; private set; } = 2600;
         public double ValveClearanceMm { get; private set; } = 400;
@@ -60,6 +62,8 @@ namespace FCUAutoDesign
             }
 
             BtnAgentPlan.IsEnabled = false;
+            pendingAgentPlan = null;
+            BtnApplyAgentPlan.Visibility = Visibility.Collapsed;
             TxtAgentStatus.Text = "正在生成只读建议…";
             try
             {
@@ -103,20 +107,10 @@ namespace FCUAutoDesign
                         "Agent 需要澄清", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
-                MessageBoxResult decision = MessageBox.Show(this,
-                    preview + Environment.NewLine + Environment.NewLine
-                    + "是否将建议回填到当前表单？回填不会执行 Revit 操作。",
-                    "确认 Agent 建议", MessageBoxButton.YesNo, MessageBoxImage.Question,
-                    MessageBoxResult.No);
-                if (decision == MessageBoxResult.Yes)
-                {
-                    if (ApplyAgentPlan(result.Plan, result.Validation.Mode))
-                        TxtAgentStatus.Text = "已回填表单，尚未执行 Revit 操作";
-                }
-                else
-                {
-                    TxtAgentStatus.Text = "建议未回填";
-                }
+                pendingAgentPlan = result.Plan;
+                pendingAgentMode = result.Validation.Mode;
+                BtnApplyAgentPlan.Visibility = Visibility.Visible;
+                TxtAgentStatus.Text = "请检查建议后点击“应用建议”";
             }
             catch (Exception ex)
             {
@@ -127,6 +121,14 @@ namespace FCUAutoDesign
             {
                 BtnAgentPlan.IsEnabled = true;
             }
+        }
+
+        private void BtnApplyAgentPlan_Click(object sender, RoutedEventArgs e)
+        {
+            if (!ApplyAgentPlan(pendingAgentPlan, pendingAgentMode)) return;
+            pendingAgentPlan = null;
+            BtnApplyAgentPlan.Visibility = Visibility.Collapsed;
+            TxtAgentStatus.Text = "已回填表单，尚未执行 Revit 操作";
         }
 
         private bool ApplyAgentPlan(AgentPlan plan, AgentPlanMode mode)

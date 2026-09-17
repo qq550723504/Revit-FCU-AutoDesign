@@ -89,14 +89,16 @@ namespace FCUAutoDesign
                 {
                     RoomDiscoveryResult discovered = discoveryService.DiscoverRooms(doc, doc.ActiveView,
                         options.AutomaticRoomNameKeywords, options.OperationMode);
-                    bool? useDiscoveredRooms = discoveryService.ConfirmRooms(discovered);
-                    if (!useDiscoveredRooms.HasValue) return Result.Cancelled;
-                    if (useDiscoveredRooms.Value)
+                    if (discovered.Rooms.Count > 0)
                     {
                         rooms = discovered.Rooms.ToList();
                         automaticRoomDiscovery = discovered;
                         foreach (KeyValuePair<int, ElementId> door in discovered.ResolvedDoorIds)
                             options.SelectedDoorIds[door.Key] = door.Value;
+                    }
+                    else
+                    {
+                        discoveryService.ShowRoomDiscoveryFallback(discovered);
                     }
                 }
                 if (rooms == null)
@@ -148,8 +150,8 @@ namespace FCUAutoDesign
                 }
 
                 PipeDiscoveryResult supplyDiscovery = null, returnDiscovery = null, drainDiscovery = null;
-                bool useAutomaticPipes = false;
                 List<AutomaticScopeZone> automaticZones = null;
+                AutomaticZoneResult automaticZoneResult = null;
                 if (options.EnableAutomaticScopeDiscovery)
                 {
                     supplyDiscovery = discoveryService.DiscoverPipe(doc, doc.ActiveView, rooms, options,
@@ -162,13 +164,15 @@ namespace FCUAutoDesign
                             MEPSystemClassification.Sanitary, "冷凝水主管");
                     AutomaticZoneResult zoneResult = discoveryService.BuildZones(
                         rooms, supplyDiscovery, returnDiscovery, drainDiscovery, options);
-                    bool? useDiscoveredZones = discoveryService.ConfirmZones(zoneResult);
-                    if (!useDiscoveredZones.HasValue) return Result.Cancelled;
-                    useAutomaticPipes = useDiscoveredZones.Value;
-                    if (useAutomaticPipes)
+                    if (zoneResult.Zones.Count > 0)
                     {
+                        automaticZoneResult = zoneResult;
                         automaticZones = zoneResult.Zones.ToList();
                         rooms = automaticZones.SelectMany(x => x.Rooms).ToList();
+                    }
+                    else
+                    {
+                        discoveryService.ShowZoneDiscoveryFallback(zoneResult);
                     }
                 }
 
@@ -181,14 +185,15 @@ namespace FCUAutoDesign
                 if (reconciliation == ReconciliationPreviewOutcome.PreviewOnly)
                     return Result.Cancelled;
 
-                if (options.EnableBusinessRulePreview)
+                if (options.EnableBusinessRulePreview || automaticZoneResult != null)
                 {
                     FamilySymbol selectedSymbol = doc.GetElement(
                         new ElementId(options.SelectedFcuTypeId)) as FamilySymbol;
                     string selectedTypeName = selectedSymbol == null
                         ? "未找到"
                         : selectedSymbol.FamilyName + " : " + selectedSymbol.Name;
-                    if (!new FcuBusinessPreviewService().Confirm(doc, rooms, options, selectedTypeName))
+                    if (!new FcuBusinessPreviewService().Confirm(doc, rooms, options, selectedTypeName,
+                        automaticRoomDiscovery, automaticZoneResult, options.EnableBusinessRulePreview))
                         return Result.Cancelled;
                 }
 

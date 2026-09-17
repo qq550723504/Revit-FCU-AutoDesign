@@ -31,6 +31,7 @@
                             <TextBox x:Name="TxtAgentRequest" MinHeight="54" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxLength="4000" Background="#0f172a" Foreground="#e2e8f0" BorderBrush="#475569" Padding="5"/>
                             <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
                                 <Button x:Name="BtnAgentPlan" Content="生成只读建议" Width="110" Height="28" Background="#0e7490" Foreground="White" BorderThickness="0" Click="BtnAgentPlan_Click"/>
+                                <Button x:Name="BtnApplyAgentPlan" Content="应用建议" Width="80" Height="28" Margin="8,0,0,0" Visibility="Collapsed" Background="#15803d" Foreground="White" BorderThickness="0" Click="BtnApplyAgentPlan_Click"/>
                                 <TextBlock x:Name="TxtAgentStatus" Text="尚未生成" VerticalAlignment="Center" Foreground="#94a3b8" FontSize="11" Margin="10,0,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                             <TextBox x:Name="TxtAgentPreview" IsReadOnly="True" Visibility="Collapsed" MaxHeight="130" Margin="0,7,0,0" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Background="#0f172a" Foreground="#cbd5e1" BorderBrush="#334155" Padding="5"/>

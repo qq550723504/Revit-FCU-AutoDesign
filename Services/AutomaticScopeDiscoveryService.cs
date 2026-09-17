@@ -225,34 +225,10 @@ namespace FCUAutoDesign
             return result;
         }
 
-        public bool? ConfirmZones(AutomaticZoneResult result)
+        public void ShowZoneDiscoveryFallback(AutomaticZoneResult result)
         {
-            if (result.Zones.Count == 0)
-            {
-                TaskDialog.Show("未形成自动主管区域", string.Join(Environment.NewLine, result.Rejections)
-                    + Environment.NewLine + "将改为手动选择。");
-                return false;
-            }
-            StringBuilder content = new StringBuilder();
-            for (int i = 0; i < result.Zones.Count; i++)
-            {
-                AutomaticScopeZone zone = result.Zones[i];
-                content.AppendLine("区域 " + (i + 1) + "：" + zone.Rooms.Count + " 个房间；供水 ID "
-                    + zone.Supply.Id.IntegerValue
-                    + (zone.Return == null ? string.Empty : "，回水 ID " + zone.Return.Id.IntegerValue)
-                    + (zone.Condensate == null ? string.Empty : "，冷凝水 ID " + zone.Condensate.Id.IntegerValue));
-            }
-            TaskDialog dialog = new TaskDialog("自动主管区域确认")
-            {
-                MainInstruction = "发现 " + result.Zones.Count + " 个独立横向主管区域",
-                MainContent = content.ToString(),
-                ExpandedContent = string.Join(Environment.NewLine, result.Rejections.Select(x => "排除：" + x)),
-                FooterText = "各区域独立执行，不会生成连接不同区域的主管。",
-                CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No | TaskDialogCommonButtons.Cancel,
-                DefaultButton = TaskDialogResult.No
-            };
-            TaskDialogResult choice = dialog.Show();
-            return choice == TaskDialogResult.Cancel ? (bool?)null : choice == TaskDialogResult.Yes;
+            TaskDialog.Show("未形成自动主管区域", string.Join(Environment.NewLine, result.Rejections)
+                + Environment.NewLine + "将改为手动选择。");
         }
 
         private static List<PipeRunCandidate> Covering(PipeDiscoveryResult result, Room room)
@@ -275,29 +251,11 @@ namespace FCUAutoDesign
             return Math.Sqrt(width * width + depth * depth) + familyPlanExtent;
         }
 
-        public bool? ConfirmRooms(RoomDiscoveryResult discovery)
+        public void ShowRoomDiscoveryFallback(RoomDiscoveryResult discovery)
         {
-            if (discovery.Rooms.Count == 0)
-            {
-                TaskDialog.Show("未发现可自动选择的房间",
-                    (discovery.Rejections.Count == 0 ? "当前视图没有房间。" : string.Join(Environment.NewLine, discovery.Rejections))
-                    + Environment.NewLine + "将改为手动拾取房间。");
-                return false;
-            }
-            StringBuilder details = new StringBuilder();
-            foreach (Room room in discovery.Rooms)
-                details.AppendLine("使用：" + room.Number + " " + room.Name + "（ID " + room.Id.IntegerValue + "）");
-            foreach (string rejection in discovery.Rejections) details.AppendLine("排除：" + rejection);
-            TaskDialog dialog = new TaskDialog("自动发现房间")
-            {
-                MainInstruction = "发现 " + discovery.Rooms.Count + " 个当前视图同楼层有效目标房间",
-                MainContent = "选择“是”使用这些房间；选择“否”改为手动拾取。",
-                ExpandedContent = details.ToString(),
-                CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No | TaskDialogCommonButtons.Cancel,
-                DefaultButton = TaskDialogResult.No
-            };
-            TaskDialogResult choice = dialog.Show();
-            return choice == TaskDialogResult.Cancel ? (bool?)null : choice == TaskDialogResult.Yes;
+            TaskDialog.Show("未发现可自动选择的房间",
+                (discovery.Rejections.Count == 0 ? "当前视图没有房间。" : string.Join(Environment.NewLine, discovery.Rejections))
+                + Environment.NewLine + "将改为手动拾取房间。");
         }
 
         public bool? ConfirmPipes(IEnumerable<PipeDiscoveryResult> discoveries, IEnumerable<Room> rooms)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
@@ -25,10 +26,12 @@ namespace FCUAutoDesign
             new EquipmentCatalogEntry { SeriesId = "FP", ModelCode = "FP-34", RatedCoolingCapacityKw = 1.80 }
         };
 
-        public bool Confirm(Document doc, IList<Room> rooms, FcuDesignOptions options, string selectedTypeName)
+        public bool Confirm(Document doc, IList<Room> rooms, FcuDesignOptions options, string selectedTypeName,
+            RoomDiscoveryResult roomDiscovery = null, AutomaticZoneResult zoneResult = null,
+            bool includeBusinessCalculation = true)
         {
             List<string> lines = new List<string>();
-            foreach (Room room in rooms)
+            if (includeBusinessCalculation) foreach (Room room in rooms)
             {
                 FamilyInstance selectedDoor = null;
                 ElementId selectedDoorId;
@@ -75,15 +78,57 @@ namespace FCUAutoDesign
                             x.YFromReferenceEdgeM, x.AbsoluteElevationM)))));
             }
 
-            TaskDialog dialog = new TaskDialog("FCU-201 业务规则预览");
-            dialog.MainInstruction = "请确认 FCU 业务规则计算方案";
-            dialog.MainContent = string.Join(Environment.NewLine, lines)
-                + Environment.NewLine + Environment.NewLine
-                + "当前选择的 Revit 族类型：" + selectedTypeName + Environment.NewLine
-                + (options.EnableMultipleFcus
-                    ? "确认后按上述台数和点位放置，每台均使用所选 Revit 族类型；任一台接管失败，整间回滚。"
-                    : "多台放置未启用：确认后每间仅放置一台，以上台数和型号仅供预览。")
-                + "目录型号仍为建议，未自动替换族类型、修改管径或保存设计记录。";
+            StringBuilder main = new StringBuilder();
+            main.AppendLine("模式：" + (options.OperationMode == FcuOperationMode.Create ? "首次生成" : "修改重算"));
+            main.AppendLine("目标房间：" + rooms.Count + " 个；Revit 族类型：" + selectedTypeName);
+            main.AppendLine(string.Format("冷指标 {0:0.##} W/m²；距门侧墙 {1:0.##} mm；安装高度 {2:0.##} mm；{3}",
+                options.CoolingIndexWPerSquareMeter, options.DoorOffsetMm, options.FcuElevationMm,
+                options.EnableMultipleFcus ? "多台均布" : "每间一台"));
+            main.AppendLine("连接：供水" + (options.EnableReturnPipe ? "、回水" : string.Empty)
+                + (options.EnableCondensate ? "、冷凝水" : string.Empty)
+                + (options.BreakCurveAndTee ? "；主管打断插三通" : "；不打断主管"));
+            if (zoneResult != null)
+                main.AppendLine("自动主管区域：" + zoneResult.Zones.Count + " 个；未覆盖或不唯一房间："
+                    + zoneResult.Rejections.Count + " 个。");
+            if (includeBusinessCalculation)
+                main.AppendLine("业务计算：已生成每房间负荷、台数和建议型号，详见展开内容。");
+
+            StringBuilder details = new StringBuilder();
+            details.AppendLine("【使用房间】");
+            foreach (Room room in rooms)
+                details.AppendLine(room.Number + " " + room.Name + "（ID " + room.Id.IntegerValue + "）");
+            if (zoneResult != null)
+            {
+                details.AppendLine("【自动主管区域】");
+                for (int i = 0; i < zoneResult.Zones.Count; i++)
+                {
+                    AutomaticScopeZone zone = zoneResult.Zones[i];
+                    details.AppendLine("区域 " + (i + 1) + "：" + zone.Rooms.Count + " 个房间；供水 ID "
+                        + zone.Supply.Id.IntegerValue
+                        + (zone.Return == null ? string.Empty : "，回水 ID " + zone.Return.Id.IntegerValue)
+                        + (zone.Condensate == null ? string.Empty : "，冷凝水 ID " + zone.Condensate.Id.IntegerValue));
+                }
+            }
+            if (lines.Count > 0)
+            {
+                details.AppendLine("【业务计算】");
+                foreach (string line in lines) details.AppendLine(line);
+            }
+            List<string> exclusions = new List<string>();
+            if (roomDiscovery != null) exclusions.AddRange(roomDiscovery.Rejections);
+            if (zoneResult != null) exclusions.AddRange(zoneResult.Rejections);
+            if (exclusions.Count > 0)
+            {
+                details.AppendLine("【未自动处理】");
+                foreach (string rejection in exclusions.Take(100)) details.AppendLine(rejection);
+                if (exclusions.Count > 100) details.AppendLine("其余 " + (exclusions.Count - 100) + " 项未展开。");
+            }
+
+            TaskDialog dialog = new TaskDialog("FCU 综合执行预览");
+            dialog.MainInstruction = "确认一次后开始放置与接管";
+            dialog.MainContent = main.ToString();
+            dialog.ExpandedContent = details.ToString();
+            dialog.FooterText = "确认后才会进入现有 Revit 事务；任一房间接管失败时该房间整体回滚。目录型号仅为建议，不会自动替换所选族类型或启用正式选径。";
             dialog.CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No;
             dialog.DefaultButton = TaskDialogResult.No;
             return dialog.Show() == TaskDialogResult.Yes;

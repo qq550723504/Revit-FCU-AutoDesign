@@ -79,7 +79,7 @@ namespace FCUAutoDesign.Agent
                 Environment.SetEnvironmentVariable("FCU_AGENT_API_KEY", null);
                 AgentConfiguration defaults = AgentConfiguration.FromEnvironment();
                 Check(defaults.BaseUrl == AgentConfiguration.DefaultBaseUrl,
-                    "Aliyun workspace compatible endpoint is the default base URL");
+                    "Verified Aliyun compatible endpoint is the default base URL");
                 Check(defaults.Model == "qwen3.8-max"
                     && string.IsNullOrWhiteSpace(defaults.ApiKey),
                     "Latest Qwen flagship alias is default while API key stays empty");

@@ -21,7 +21,7 @@ namespace FCUAutoDesign.Agent
     public sealed class AgentConfiguration
     {
         public const string DefaultBaseUrl =
-            "https://ws-fdp0ta8nlc7o4157.cn-beijing.maas.aliyuncs.com/compatible-mode/v1";
+            "https://dashscope.aliyuncs.com/compatible-mode/v1";
         public const string DefaultModel = "qwen3.8-max";
 
         public string BaseUrl { get; set; }

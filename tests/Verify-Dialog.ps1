@@ -51,6 +51,8 @@ try {
     Assert-True ($window.FindName('BtnAgentPlan').Content -eq '生成方案') 'AI plan action uses the current product wording'
     Assert-True ($window.FindName('BtnApplyAgentPlan').Content -eq '应用方案') 'AI apply action uses consistent product wording'
     Assert-True ($window.FindName('BtnApplyAgentPlan').Visibility.ToString() -eq 'Collapsed') 'Agent apply action is explicit and hidden until a valid plan exists'
+    Assert-True ($window.Title -eq 'FCU 自动布置与接管（验证版）') 'Customer window title does not expose internal PoC wording'
+    Assert-True ($window.FindName('ChkBusinessPreview').Content -eq '启用负荷、台数和点位预览') 'Business preview label does not expose internal issue numbers'
     Assert-True ($window.FindName('TxtAutomaticRoomKeywords').Text -eq '会议室;办公室') 'Target room keywords have an explicit editable default'
     Assert-True ($window.FindName('ChkAutoDn').IsEnabled -eq $false -and $window.FindName('ChkAutoDn').IsChecked -eq $false -and -not $window.EnableAutoSizing) 'Unconfirmed hydraulic auto-sizing is disabled'
     Assert-True ($null -eq $window.FindName('TxtCondensateSlope')) 'No condensate slope input exists'

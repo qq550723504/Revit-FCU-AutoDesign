@@ -2,11 +2,11 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 
 [assembly: AssemblyTitle("FCUAutoDesign")]
-[assembly: AssemblyDescription("Revit BIM FCU Auto Design & Pipe Routing PoC Tool")]
+[assembly: AssemblyDescription("Revit BIM FCU Auto Design & Pipe Routing Validation Build")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("MyCompany")]
+[assembly: AssemblyCompany("FCUAutoDesign")]
 [assembly: AssemblyProduct("FCUAutoDesign")]
-[assembly: AssemblyCopyright("Copyright © 2024")]
+[assembly: AssemblyCopyright("Copyright © 2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

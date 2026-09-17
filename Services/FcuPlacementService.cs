@@ -64,7 +64,7 @@ namespace FCUAutoDesign
                 throw new InvalidOperationException("需要房间关联门及其所在的直墙，才能保证 FCU 出风口平面与门侧墙面平行。请检查门的关联房间和宿主墙。");
             XYZ wallDirection = doorWallLine.Direction;
             if (Math.Abs(wallDirection.Z) > 1e-6)
-                throw new InvalidOperationException("门所在墙的定位线不是水平直线，当前 PoC 无法确定出风方向。");
+                throw new InvalidOperationException("门所在墙的定位线不是水平直线，当前验证版无法确定出风方向。");
             XYZ placePoint;
             XYZ forwardDir;
 

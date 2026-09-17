@@ -1,105 +1,77 @@
-﻿# FCUAutoDesign
+# FCUAutoDesign
 
-这是一个 Autodesk Revit 的插件项目，用于在 Revit 中布置风机盘管（FCU）并自动处理相关管线连接与避让逻辑。
+FCUAutoDesign 是 Autodesk Revit 2020 / .NET Framework 4.8 外接程序，用于同楼层多房间 FCU 布置、供回水和冷凝水接管、设计记录及受限修改重算。
 
-当前最小 PoC 的验证基线为 **Revit 2020 / .NET Framework 4.8**。已完成编译和窗口回归检查，真实接管尚未验收；模型条件、已知边界和用例见 [POC验证.md](POC验证.md)。当前路径为固定下翻规则，不包含碰撞检测或水力计算。
+当前是工程验证版。模型连接成功不代表正式水力、冷凝水坡度或施工净距验收通过。使用条件、安装步骤和客户验收边界见 [使用文档.md](使用文档.md)，实现演进证据见 [POC验证.md](POC验证.md)。
 
-## 项目简介
+## 已实现能力
 
-该插件主要包括：
+- 门侧墙内偏移定位，单台或按 L/5 向上取整的多台均布。
+- 使用实际送风接口校正 FCU 朝向。
+- 供水、可选回水和可选 `Sanitary` 冷凝水接管。
+- 不下翻、下翻及有限横移候选，连接链、安装净长和本批次回路实体干涉检查。
+- 当前平面视图内按房间名称关键词自动选房，并按可唯一覆盖的主管段组分区执行。
+- 每房间事务组、同房间多台整体回滚和批量真实结果报告。
+- Revit Extensible Storage 设计身份、版本和上次成功快照。
+- 只允许更新冷指标和设计负荷记录的受限修改重算。
+- OpenAI 兼容接口驱动的 AI 参数方案，严格 JSON 架构和本地二次校验。
 
-- FCU 的放置与参数控制
-- 房间 / 门 / 标高的几何判断
-- 供水、回水、冷凝水管路的连接逻辑
-- WPF 参数配置界面
-- Revit 外接程序入口 `CmdPlaceFCUAndConnect`
+## 明确未实现
 
-## 运行要求
+- 正式设备型号与 Revit 族类型自动映射。
+- 正式水力选径；界面开关保持禁用。
+- 冷凝水坡度、重力排水和水力性能验算。
+- 全模型、链接模型、保温、套管、检修空间和施工净距检查。
+- 已有设备、型号、数量、位置及管线几何的自动重建。
 
-- Windows
-- Autodesk Revit 2020（本轮本机编译基线；其他版本需独立验证）
-- Visual Studio 2022
-- .NET Framework 4.8
-- 需要安装 Revit SDK / 对应 API 参考库
+## 代码边界
 
-## 关键说明
+- `CmdPlaceFCUAndConnect.cs`：命令编排、范围确定、综合预览和批量结果。
+- `FCUDesignWindow.xaml(.cs)`：参数窗口与 AI 方案回填；不直接写 Revit 模型。
+- `Agent/`：兼容接口、提示词、严格输出契约和本地校验。
+- `Domain/EquipmentSelection/`：独立于 Revit/WPF 的负荷、台数、预览型号和局部点位计算。
+- `Services/AutomaticScopeDiscoveryService.cs`：当前平面视图房间和主管段组发现。
+- `Services/FcuPlacementService.cs`：门侧定位、房间包含和送风方向校验。
+- `Services/FcuDesignService.cs`：单房间事务组、放置、接管、提交复核和设计记录。
+- `Services/HydronicConnectionService.cs`、`HydronicSeparationService.cs`：供回水候选与主管接入。
+- `Services/CondensateSeparationService.cs`：冷凝水候选、试建预算、连通和回路干涉验证。
+- `Services/DesignRecordRepository.cs`：Revit Extensible Storage 持久化。
+- `Services/DesignReconciliationPreviewService.cs`：三方差异预览和纯计算记录更新。
+- `tests/Verify-*.ps1`：可重复的独立逻辑与窗口回归检查。
 
-本项目是 Revit Add-in，不是 .NET Core 项目。编译时需要使用 Visual Studio 的 MSBuild 和对应版本的 Revit API DLL。
+`FcuDesignService` 持有每个房间的主事务和事务组。局部候选使用子事务，失败后回滚；提交后的设备位置、朝向、连接链和安装条件复核仍位于可整体回滚的事务组内。
 
-项目中的 Revit 引用路径可通过 MSBuild 属性覆盖，例如：
+## Release 编译
 
 ```powershell
-msbuild FCUAutoDesign.csproj /p:RevitVersion=2022 /p:RevitInstallPath="C:\Program Files\Autodesk\Revit 2022"
+& 'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe' `
+  FCUAutoDesign.csproj /t:Rebuild /p:Configuration=Release /p:Platform=x64 `
+  /p:RevitVersion=2020 /nologo /verbosity:minimal
 ```
 
-如果没有显式指定 `RevitInstallPath`，默认会尝试查找标准安装目录。
+输出文件：`bin\Release\FCUAutoDesign.dll`。
 
-## 目录说明
+## 安装
 
-- `CmdPlaceFCUAndConnect.cs`：Revit 外接程序入口，负责参数确认、模型拾取和结果展示调用
-- `Services/FcuDesignService.cs`：布置与接管流程，统一持有主事务和事务组，提交后复核模型
-- `Services/FcuPlacementService.cs`：房间内定位、设备放置与出风接口朝向验证
-- `Services/HydronicConnectionService.cs`：供回水固定路径支管、弯头与三通接入
-- `Services/HydronicSeparationService.cs`：回水避让候选重试及供回水实体干涉检查
-- `Services/CondensateSeparationService.cs`：冷凝水复用供回水固定路径，执行 Sanitary 系统的支管、主管打断与三通接入
-- `Services/FcuConnectorResolver.cs`、`Services/FcuTypeCatalog.cs`：设备接口识别和候选族类型查询
-- `Services/ConnectionChainVerifier.cs`：按指定接口与元素链验证连接关系
-- `Geometry/LowerFlipRoutePlanner.cs`：当前供回水和冷凝水接管使用的路径计算与直角转折校验
-- `Geometry/OutletLeadPlanner.cs`：根据已有供回水障碍物建议冷凝水提前转弯长度；建议后仍需实体检查
-- `Geometry/CondensateRoutePlanner.cs`：旧版冷凝水几何计算，当前接管流程不调用；其测试不能证明当前路线通过
-- `Models/`：参数快照、放置结果、连接结果与执行结果
-- `Infrastructure/`：单位常量、拾取过滤器、管道接口访问和 Revit 失败处理器
-- `Presentation/ExecutionReportPresenter.cs`：执行结果报告
-- `FCUDesignWindow.xaml`：参数配置界面
-- `FCUDesignWindow.xaml.cs`：界面逻辑
-- `Agent/`：AI 参数方案的提示词、严格输出契约、兼容接口客户端与本地校验；只回填表单，不直接调用 Revit API
-- `FCUAutoDesign.addin`：Revit 插件加载配置
-- `FCUAutoDesign.csproj`：项目文件
+关闭 Revit，将 `FCUAutoDesign.dll` 和 `FCUAutoDesign.addin` 放到：
 
-服务不读取 WPF 窗口；命令确认参数后通过 `FcuDesignOptions` 传入。
-主事务仅由 `FcuDesignService` 提交，提交后的位置、朝向与连接链复核仍在事务组内，失败时整组回滚。
-三通和冷凝水服务保留局部子事务，其他服务不自行开启或提交主事务。
-这些类保留在同一个程序集；新增源文件需加入项目文件的 `Compile` 列表。
+```text
+%APPDATA%\Autodesk\Revit\Addins\2020\
+```
+
+清单使用同目录相对路径 `<Assembly>FCUAutoDesign.dll</Assembly>`。复制后重新启动 Revit。
 
 ## AI 方案助手配置
-
-AI 方案助手通过 OpenAI 兼容的 Chat Completions 接口生成候选参数方案。API Key 不写入仓库或 DLL，使用当前 Windows 用户环境变量：
 
 ```powershell
 setx FCU_AGENT_API_KEY "替换为客户自己的密钥"
 ```
 
-可选覆盖接口地址和模型：
+可选覆盖：
 
 ```powershell
 setx FCU_AGENT_BASE_URL "https://example.com/v1"
 setx FCU_AGENT_MODEL "兼容模型名称"
 ```
 
-设置后需完全退出并重新启动 Revit。AI 输出必须先通过严格 JSON 架构和本地契约校验，用户点击“应用方案”后只会回填窗口；点击“开始放置与接管”后才进入现有 Revit 事务。不要把真实 API Key 写入配置文件、截图或客户测试包。
-
-## 编译建议
-
-建议在安装好 Visual Studio 2022 和对应 Revit 版本后，使用 Visual Studio 打开 `.sln` 文件进行编译。
-
-确保以下组件已安装：
-
-- .NET desktop development
-- C# 开发支持
-- 对应 Revit 版本的 API 依赖
-
-## 注意事项
-
-- 这是 Revit 插件项目，不适合直接当普通 .NET Core 项目运行
-- Revit 版本切换时，需要检查 DLL 路径和兼容性
-- 某些环境可能需要管理员权限或对应 Autodesk SDK
-
-## 许可说明
-
-本项目仅供内部开发与学习使用，具体使用范围请遵循项目所属团队或组织的授权要求。
-
-当前 Debug 输出和本机 Revit 注册路径统一为 `bin/MultiRoom/FCUAutoDesign.dll`（旧 Debug DLL 被运行中的 Revit 占用）。修改后需重启 Revit 才能加载新版。
-
-`CondensateSeparationService` 负责冷凝水候选重试；`CircuitInterferenceVerifier` 统一检查回路间管道与管件实体相交。
-
-批量入口：`FcuBatchService` 按房间隔离事务；`RoomBatchContext` 管理已提交回路；`MainPipeRun` 跟踪主管分段；`BatchReportPresenter` 汇总逐房间结果。首版仅支持同楼层、单门房间及共用所选主管。
+设置后重启 Revit。API Key 不应进入源码、`.addin`、测试包、日志或截图。AI 仅生成候选参数并回填表单，不能绕过用户确认和现有 Revit 事务。

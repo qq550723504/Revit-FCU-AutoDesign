@@ -1,7 +1,7 @@
 ﻿<Window x:Class="FCUAutoDesign.FCUDesignWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FCU 同楼层多房间放置与接管 PoC"
+        Title="FCU 自动布置与接管（验证版）"
         Height="720" Width="520"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -17,7 +17,7 @@
         <!-- 标题区 -->
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
             <TextBlock Text="FCU 同楼层多房间布置" FontSize="16" FontWeight="Bold" Foreground="#38bdf8"/>
-            <TextBlock Text="验证模型位置与连接关系；不含水力计算和碰撞检查" FontSize="11" Foreground="#94a3b8" Margin="0,4,0,0"/>
+            <TextBlock Text="不含正式水力选径、冷凝水坡度和全模型碰撞检查" FontSize="11" Foreground="#94a3b8" Margin="0,4,0,0"/>
         </StackPanel>
 
         <!-- 参数表单 -->
@@ -110,7 +110,7 @@
                                 <TextBox x:Name="TxtAutomaticRoomKeywords" Grid.Column="1" Text="会议室;办公室" Background="#0f172a" Foreground="#67e8f9" BorderBrush="#475569" Padding="4"/>
                             </Grid>
                             <CheckBox x:Name="ChkAutoDn" Content="正式自动选径（等待水力表及匹配依据确认）" IsChecked="False" IsEnabled="False" Foreground="#64748b" Margin="0,3,0,0" FontSize="11"/>
-                            <CheckBox x:Name="ChkBusinessPreview" Content="启用 FCU-201 业务规则预览（确认后继续现有 PoC）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
+                            <CheckBox x:Name="ChkBusinessPreview" Content="启用负荷、台数和点位预览" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkMultipleFcus" Content="按 L/5 向上取整放置多台（均使用所选族类型）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
                             <TextBlock Text="多台沿门侧墙等距布置，任一台接管失败则整间回滚；未自动匹配目录型号，三路支管分别采用设备实际接口尺寸。" TextWrapping="Wrap" Foreground="#94a3b8" FontSize="11"/>
                             <CheckBox x:Name="ChkEnableReturn" Content="连接走廊回水主管" IsChecked="True" Foreground="#c084fc" Margin="0,6,0,0" FontSize="11"/>

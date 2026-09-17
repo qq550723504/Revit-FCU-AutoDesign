@@ -1,17 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <RevitAddIns>
   <!-- 
-    Revit 2020 PoC 插件注册清单文件
+    Revit 2020 验证版插件注册清单文件
     放置路径: %AppData%\Autodesk\Revit\Addins\2020\FCUAutoDesign.addin
   -->
   <AddIn Type="Command">
-    <Name>FCU PoC Tool - 智能排布与下翻避让</Name>
-    <Text>FCU 放置与接管 PoC</Text>
+    <Name>FCU 自动布置与接管（验证版）</Name>
+    <Text>FCU 自动布置与接管</Text>
     <Assembly>FCUAutoDesign.dll</Assembly>
     <FullClassName>FCUAutoDesign.CmdPlaceFCUAndConnect</FullClassName>
     <AddInId>B8E5F72A-26E4-4D2A-9467-3A2F9B8A7E11</AddInId>
     <VisibilityMode>NotVisibleInFamily</VisibilityMode>
-    <VendorId>MyCompany</VendorId>
-    <VendorDescription>FCU BIM Auto-design PoC (Local Dev)</VendorDescription>
+    <VendorId>FCUA</VendorId>
+    <VendorDescription>FCU BIM Auto-design validation build for Revit 2020</VendorDescription>
   </AddIn>
 </RevitAddIns>

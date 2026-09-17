@@ -46,6 +46,7 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Web.Extensions" />
     <Reference Include="PresentationCore" />
@@ -66,6 +67,7 @@
     <Compile Include="Agent\AgentContracts.cs" />
     <Compile Include="Agent\AgentPlanValidator.cs" />
     <Compile Include="Agent\AgentPromptBuilder.cs" />
+    <Compile Include="Agent\AgentSettingsStore.cs" />
     <Compile Include="Agent\OpenAiCompatibleAgentClient.cs" />
     <Compile Include="Models\TeeConnectionResult.cs" />
     <Compile Include="Models\FCUConnectors.cs" />

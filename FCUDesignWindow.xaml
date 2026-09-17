@@ -27,7 +27,33 @@
                     <Border BorderBrush="#0e7490" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,14" Background="#13263a">
                         <StackPanel>
                             <TextBlock Text="AI 方案助手" Foreground="#67e8f9" FontWeight="Bold" FontSize="12"/>
-                            <TextBlock Text="用自然语言生成参数方案。AI 不直接选择模型元素或写入 Revit；应用后只回填当前表单，点击“开始放置与接管”才执行。" TextWrapping="Wrap" Foreground="#94a3b8" FontSize="11" Margin="0,3,0,7"/>
+                            <TextBlock Text="用自然语言生成参数方案。AI 不直接选择模型元素或写入 Revit；应用后只回填当前表单，点击“确认参数并确定范围”才执行。" TextWrapping="Wrap" Foreground="#94a3b8" FontSize="11" Margin="0,3,0,7"/>
+                            <Expander x:Name="ExpAgentSettings" Header="AI 设置" Foreground="#a5f3fc" Margin="0,0,0,7">
+                                <Border BorderBrush="#334155" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,5,0,2">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="72"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="接口地址" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="11"/>
+                                            <TextBox x:Name="TxtAgentBaseUrl" Grid.Column="1" Background="#0f172a" Foreground="#e2e8f0" BorderBrush="#475569" Padding="4"/>
+                                        </Grid>
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="72"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="模型" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="11"/>
+                                            <TextBox x:Name="TxtAgentModel" Grid.Column="1" Background="#0f172a" Foreground="#e2e8f0" BorderBrush="#475569" Padding="4"/>
+                                        </Grid>
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="72"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="API Key" VerticalAlignment="Center" Foreground="#cbd5e1" FontSize="11"/>
+                                            <PasswordBox x:Name="PwdAgentApiKey" Grid.Column="1" Background="#0f172a" Foreground="#e2e8f0" BorderBrush="#475569" Padding="4"/>
+                                        </Grid>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button x:Name="BtnSaveAgentSettings" Content="保存配置" Width="82" Height="25" Background="#0369a1" Foreground="White" BorderThickness="0" Click="BtnSaveAgentSettings_Click"/>
+                                            <Button x:Name="BtnClearAgentSettings" Content="清除本机配置" Width="100" Height="25" Margin="8,0,0,0" Background="#475569" Foreground="White" BorderThickness="0" Click="BtnClearAgentSettings_Click"/>
+                                            <TextBlock x:Name="TxtAgentSettingsStatus" Width="190" VerticalAlignment="Center" Foreground="#94a3b8" FontSize="10" Margin="8,0,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </Expander>
                             <TextBox x:Name="TxtAgentRequest" MinHeight="54" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxLength="4000" Background="#0f172a" Foreground="#e2e8f0" BorderBrush="#475569" Padding="5"/>
                             <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
                                 <Button x:Name="BtnAgentPlan" Content="生成方案" Width="110" Height="28" Background="#0e7490" Foreground="White" BorderThickness="0" Click="BtnAgentPlan_Click"/>

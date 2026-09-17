@@ -63,6 +63,10 @@ FCUAutoDesign 是 Autodesk Revit 2020 / .NET Framework 4.8 外接程序，用于
 
 ## AI 方案助手配置
 
+优先在插件窗口展开“AI 设置”，填写兼容接口地址、模型和 API Key 后保存。配置立即生效；API Key 通过 Windows DPAPI 按当前用户加密，保存在 `%LOCALAPPDATA%\FCUAutoDesign\agent-settings.json`。
+
+环境变量保留为兼容回退：
+
 ```powershell
 setx FCU_AGENT_API_KEY "替换为客户自己的密钥"
 ```

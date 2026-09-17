@@ -14,6 +14,8 @@ namespace FCUAutoDesign
     {
         private AgentPlan pendingAgentPlan;
         private AgentPlanMode pendingAgentMode;
+        private readonly AgentSettingsStore agentSettingsStore = new AgentSettingsStore();
+        private AgentConfiguration activeAgentConfiguration;
         public double DoorOffsetMm { get; private set; } = 500;
         public double FcuElevationMm { get; private set; } = 2600;
         public double ValveClearanceMm { get; private set; } = 400;
@@ -41,6 +43,62 @@ namespace FCUAutoDesign
         public FCUDesignWindow()
         {
             InitializeComponent();
+            LoadAgentSettings();
+        }
+
+        private void LoadAgentSettings()
+        {
+            AgentSettingsLoadResult result = agentSettingsStore.Load();
+            activeAgentConfiguration = result.Configuration;
+            TxtAgentBaseUrl.Text = activeAgentConfiguration.BaseUrl ?? string.Empty;
+            TxtAgentModel.Text = activeAgentConfiguration.Model ?? string.Empty;
+            PwdAgentApiKey.Password = string.Empty;
+            string source = result.IsSavedLocally ? "已读取本机加密配置" : "使用环境变量或默认值";
+            if (!string.IsNullOrWhiteSpace(result.Warning)) source += "；" + result.Warning;
+            else if (!string.IsNullOrWhiteSpace(activeAgentConfiguration.ApiKey)) source += "；密钥已配置";
+            TxtAgentSettingsStatus.Text = source;
+        }
+
+        private void BtnSaveAgentSettings_Click(object sender, RoutedEventArgs e)
+        {
+            string enteredKey = PwdAgentApiKey.Password;
+            AgentConfiguration configuration = new AgentConfiguration
+            {
+                BaseUrl = (TxtAgentBaseUrl.Text ?? string.Empty).Trim(),
+                Model = (TxtAgentModel.Text ?? string.Empty).Trim(),
+                ApiKey = string.IsNullOrWhiteSpace(enteredKey)
+                    ? activeAgentConfiguration?.ApiKey : enteredKey
+            };
+            try
+            {
+                agentSettingsStore.Save(configuration);
+                activeAgentConfiguration = configuration;
+                PwdAgentApiKey.Password = string.Empty;
+                TxtAgentSettingsStatus.Text = "已保存；密钥由 Windows 当前用户加密";
+                ExpAgentSettings.IsExpanded = false;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException
+                || ex is System.IO.IOException || ex is UnauthorizedAccessException
+                || ex is System.Security.Cryptography.CryptographicException)
+            {
+                TxtAgentSettingsStatus.Text = "保存失败";
+                MessageBox.Show(this, ex.Message, "AI 配置无效");
+            }
+        }
+
+        private void BtnClearAgentSettings_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                agentSettingsStore.Delete();
+                LoadAgentSettings();
+                TxtAgentSettingsStatus.Text = "本机配置已清除；已恢复环境变量或默认值";
+            }
+            catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
+            {
+                TxtAgentSettingsStatus.Text = "清除失败";
+                MessageBox.Show(this, ex.Message, "AI 配置清除失败");
+            }
         }
 
         private async void BtnAgentPlan_Click(object sender, RoutedEventArgs e)
@@ -83,7 +141,7 @@ namespace FCUAutoDesign
                 };
                 AgentCallResult result;
                 using (OpenAiCompatibleAgentClient client =
-                    new OpenAiCompatibleAgentClient(AgentConfiguration.FromEnvironment()))
+                    new OpenAiCompatibleAgentClient(activeAgentConfiguration ?? agentSettingsStore.Load().Configuration))
                 {
                     result = await client.CreatePlanAsync(context, CancellationToken.None);
                 }

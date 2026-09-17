@@ -59,6 +59,12 @@ namespace FCUAutoDesign.Agent
         public FcuOperationMode CurrentMode { get; set; }
         public IList<string> CurrentRoomNameKeywords { get; set; } = new List<string>();
         public double CoolingIndexWPerSquareMeter { get; set; }
+        public double DoorOffsetMm { get; set; }
+        public double FcuElevationMm { get; set; }
+        public bool EnableMultipleFcus { get; set; }
+        public bool EnableAutomaticScopeDiscovery { get; set; }
+        public bool EnableReturnPipe { get; set; }
+        public bool EnableCondensate { get; set; }
         public IList<AgentRoomContext> Rooms { get; set; } = new List<AgentRoomContext>();
         public string DiagnosticText { get; set; }
     }
@@ -70,6 +76,14 @@ namespace FCUAutoDesign.Agent
         public string mode { get; set; }
         public IList<string> room_name_keywords { get; set; } = new List<string>();
         public double? cooling_index_w_per_square_meter { get; set; }
+        public double? door_offset_mm { get; set; }
+        public double? fcu_elevation_mm { get; set; }
+        public bool? enable_multiple_fcus { get; set; }
+        public bool? enable_automatic_scope_discovery { get; set; }
+        public bool? connect_supply { get; set; }
+        public bool? connect_return { get; set; }
+        public bool? connect_condensate { get; set; }
+        public IList<string> clarifications { get; set; } = new List<string>();
         public IList<string> observations { get; set; } = new List<string>();
         public IList<string> warnings { get; set; } = new List<string>();
         public IList<string> blocked_actions { get; set; } = new List<string>();
@@ -79,6 +93,7 @@ namespace FCUAutoDesign.Agent
     {
         public bool IsValid { get; set; }
         public AgentPlanMode Mode { get; set; }
+        public bool RequiresClarification { get; set; }
         public IList<string> Errors { get; } = new List<string>();
     }
 

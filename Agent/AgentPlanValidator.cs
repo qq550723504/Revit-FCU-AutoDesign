@@ -17,7 +17,7 @@ namespace FCUAutoDesign.Agent
                 result.Errors.Add("Agent 未返回计划对象。");
                 return result;
             }
-            if (plan.schema_version != 1) result.Errors.Add("不支持的 Agent 计划版本。");
+            if (plan.schema_version != 2) result.Errors.Add("不支持的 Agent 计划版本。");
             AgentPlanMode mode;
             if (!Enum.TryParse(plan.mode ?? string.Empty, true, out mode))
                 result.Errors.Add("Agent 计划模式必须是 diagnose、create 或 recalculate。");
@@ -27,14 +27,34 @@ namespace FCUAutoDesign.Agent
             ValidateList(plan.observations, "observations", MaxListItems, MaxTextLength, result);
             ValidateList(plan.warnings, "warnings", MaxListItems, MaxTextLength, result);
             ValidateList(plan.blocked_actions, "blocked_actions", MaxListItems, MaxTextLength, result);
+            ValidateList(plan.clarifications, "clarifications", 10, 500, result);
+            result.RequiresClarification = plan.clarifications != null
+                && plan.clarifications.Count > 0;
             if (plan.cooling_index_w_per_square_meter.HasValue)
             {
                 double value = plan.cooling_index_w_per_square_meter.Value;
                 if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0)
                     result.Errors.Add("冷指标建议必须是有限正数；零负荷仍需产品确认。");
             }
+            ValidateRange(plan.door_offset_mm, "距门侧墙距离", 1, 10000, result);
+            ValidateRange(plan.fcu_elevation_mm, "FCU安装高度", 1, 20000, result);
+            if (plan.enable_automatic_scope_discovery == true
+                && (plan.room_name_keywords == null || plan.room_name_keywords.Count == 0))
+                result.Errors.Add("启用自动选房时必须提供房间名称关键词。");
+            if (mode != AgentPlanMode.Diagnose && plan.connect_supply == false)
+                result.Errors.Add("现有生成与重算流程必须连接供水主管。");
             result.IsValid = result.Errors.Count == 0;
             return result;
+        }
+
+        private static void ValidateRange(double? value, string field, double minimum,
+            double maximum, AgentPlanValidationResult result)
+        {
+            if (!value.HasValue) return;
+            double number = value.Value;
+            if (double.IsNaN(number) || double.IsInfinity(number)
+                || number < minimum || number > maximum)
+                result.Errors.Add(field + "超出允许范围 " + minimum + "-" + maximum + " mm。");
         }
 
         private static void ValidateText(string value, string field, bool required,

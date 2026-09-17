@@ -54,11 +54,17 @@ namespace FCUAutoDesign.Agent
             var serializer = new JavaScriptSerializer();
             var plan = new AgentPlan
             {
-                schema_version = 1,
+                schema_version = 2,
                 summary = "Read-only plan",
                 mode = mode,
                 room_name_keywords = new List<string> { "office" },
                 cooling_index_w_per_square_meter = coolingIndex,
+                door_offset_mm = 500,
+                fcu_elevation_mm = 2500,
+                enable_multiple_fcus = true,
+                enable_automatic_scope_discovery = true,
+                connect_supply = true,
+                connect_return = true,
                 observations = new List<string> { "diagnostic" },
                 warnings = new List<string>(),
                 blocked_actions = new List<string> { "direct model write" }
@@ -171,11 +177,32 @@ namespace FCUAutoDesign.Agent
 
             var duplicate = new AgentPlan
             {
-                schema_version = 1, summary = "plan", mode = "diagnose",
+                schema_version = 2, summary = "plan", mode = "diagnose",
                 room_name_keywords = new List<string> { "office", "OFFICE" }
             };
             Check(!new AgentPlanValidator().Validate(duplicate).IsValid,
                 "Duplicate plan values are rejected deterministically");
+
+            var impossibleUnit = new AgentPlan
+            {
+                schema_version = 2, summary = "plan", mode = "create",
+                room_name_keywords = new List<string> { "office" },
+                enable_automatic_scope_discovery = true,
+                connect_supply = true,
+                door_offset_mm = 500000
+            };
+            Check(!new AgentPlanValidator().Validate(impossibleUnit).IsValid,
+                "Implausible converted wall offset is rejected locally");
+
+            var clarification = new AgentPlan
+            {
+                schema_version = 2, summary = "plan", mode = "create",
+                connect_supply = true,
+                clarifications = new List<string> { "Does 500m mean 500mm?" }
+            };
+            var clarificationResult = new AgentPlanValidator().Validate(clarification);
+            Check(clarificationResult.IsValid && clarificationResult.RequiresClarification,
+                "Ambiguous units produce a valid but non-applicable clarification plan");
             Console.WriteLine(count + " local agent core checks passed. Revit writes are NOT_RUN.");
         }
 
@@ -185,14 +212,30 @@ namespace FCUAutoDesign.Agent
             {
                 var result = client.CreatePlanAsync(new AgentRequestContext
                 {
-                    UserRequest = "Generate a read-only plan. Keep create mode and cooling index 200.",
+                    UserRequest = "Cooling index 200 W/m2. Select all offices and meeting rooms in the current plan. Place units evenly, 500 mm from the door-side wall at elevation 2.5 m. Connect supply and return corridor mains. Do not enable condensate.",
                     CurrentMode = FcuOperationMode.Create,
                     CurrentRoomNameKeywords = new List<string> { "meeting room", "office" },
-                    CoolingIndexWPerSquareMeter = 200
+                    CoolingIndexWPerSquareMeter = 200,
+                    DoorOffsetMm = 500,
+                    FcuElevationMm = 2600,
+                    EnableMultipleFcus = true,
+                    EnableAutomaticScopeDiscovery = false,
+                    EnableReturnPipe = true,
+                    EnableCondensate = false
                 }, CancellationToken.None).GetAwaiter().GetResult();
                 bool valid = result.Validation != null && result.Validation.IsValid;
                 Console.WriteLine("LIVE status=" + result.Status + "; validated=" + valid
                     + "; mode=" + (result.Validation == null ? "none" : result.Validation.Mode.ToString()));
+                if (result.Plan != null)
+                    Console.WriteLine("LIVE plan cooling=" + result.Plan.cooling_index_w_per_square_meter
+                        + "; offset_mm=" + result.Plan.door_offset_mm
+                        + "; elevation_mm=" + result.Plan.fcu_elevation_mm
+                        + "; multiple=" + result.Plan.enable_multiple_fcus
+                        + "; auto_scope=" + result.Plan.enable_automatic_scope_discovery
+                        + "; supply=" + result.Plan.connect_supply
+                        + "; return=" + result.Plan.connect_return
+                        + "; condensate=" + result.Plan.connect_condensate
+                        + "; clarifications=" + (result.Plan.clarifications == null ? 0 : result.Plan.clarifications.Count));
                 if (result.Status != AgentCallStatus.Success || !valid)
                     throw new Exception("Live Agent contract check failed: " + result.Message);
             }

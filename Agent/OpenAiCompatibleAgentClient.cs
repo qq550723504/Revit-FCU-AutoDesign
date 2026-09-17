@@ -27,7 +27,7 @@ namespace FCUAutoDesign.Agent
             this.configuration = configuration ?? new AgentConfiguration();
             http = new HttpClient(handler ?? throw new ArgumentNullException("handler"), true)
             {
-                Timeout = TimeSpan.FromSeconds(30)
+                Timeout = TimeSpan.FromSeconds(90)
             };
         }
 

@@ -50,10 +50,12 @@ namespace FCUAutoDesign
                 return;
             }
 
-            double coolingIndex;
-            if (!TryNonNegative(TxtCoolingIndex.Text, out coolingIndex))
+            double coolingIndex, doorOffset, fcuElevation;
+            if (!TryNonNegative(TxtCoolingIndex.Text, out coolingIndex)
+                || !TryPositive(TxtDoorOffset.Text, out doorOffset)
+                || !TryPositive(TxtFcuElevation.Text, out fcuElevation))
             {
-                MessageBox.Show(this, "请先填写有效的非负冷指标。", "Agent 上下文无效");
+                MessageBox.Show(this, "请先填写有效的冷指标、距墙距离和安装高度。", "Agent 上下文无效");
                 return;
             }
 
@@ -67,7 +69,13 @@ namespace FCUAutoDesign
                     CurrentMode = RbRecalculate.IsChecked == true
                         ? FcuOperationMode.Recalculate : FcuOperationMode.Create,
                     CurrentRoomNameKeywords = RoomNameKeywordPolicy.Parse(TxtAutomaticRoomKeywords.Text),
-                    CoolingIndexWPerSquareMeter = coolingIndex
+                    CoolingIndexWPerSquareMeter = coolingIndex,
+                    DoorOffsetMm = doorOffset,
+                    FcuElevationMm = fcuElevation,
+                    EnableMultipleFcus = ChkMultipleFcus.IsChecked == true,
+                    EnableAutomaticScopeDiscovery = ChkAutomaticScope.IsChecked == true,
+                    EnableReturnPipe = ChkEnableReturn.IsChecked == true,
+                    EnableCondensate = ChkEnableCondensate.IsChecked == true
                 };
                 AgentCallResult result;
                 using (OpenAiCompatibleAgentClient client =
@@ -87,6 +95,14 @@ namespace FCUAutoDesign
                 TxtAgentPreview.Text = preview;
                 TxtAgentPreview.Visibility = Visibility.Visible;
                 TxtAgentStatus.Text = "建议已通过本地契约校验";
+                if (result.Validation.RequiresClarification)
+                {
+                    TxtAgentStatus.Text = "需要先确认指令歧义，未回填";
+                    MessageBox.Show(this, preview + Environment.NewLine + Environment.NewLine
+                        + "请根据澄清项修改指令后重新生成。当前建议不会回填。",
+                        "Agent 需要澄清", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
                 MessageBoxResult decision = MessageBox.Show(this,
                     preview + Environment.NewLine + Environment.NewLine
                     + "是否将建议回填到当前表单？回填不会执行 Revit 操作。",
@@ -94,8 +110,8 @@ namespace FCUAutoDesign
                     MessageBoxResult.No);
                 if (decision == MessageBoxResult.Yes)
                 {
-                    ApplyAgentPlan(result.Plan, result.Validation.Mode);
-                    TxtAgentStatus.Text = "已回填表单，尚未执行 Revit 操作";
+                    if (ApplyAgentPlan(result.Plan, result.Validation.Mode))
+                        TxtAgentStatus.Text = "已回填表单，尚未执行 Revit 操作";
                 }
                 else
                 {
@@ -113,9 +129,10 @@ namespace FCUAutoDesign
             }
         }
 
-        private void ApplyAgentPlan(AgentPlan plan, AgentPlanMode mode)
+        private bool ApplyAgentPlan(AgentPlan plan, AgentPlanMode mode)
         {
-            if (plan == null) return;
+            if (plan == null || (plan.clarifications != null && plan.clarifications.Count > 0))
+                return false;
             if (mode == AgentPlanMode.Create) RbCreate.IsChecked = true;
             else if (mode == AgentPlanMode.Recalculate) RbRecalculate.IsChecked = true;
 
@@ -130,6 +147,21 @@ namespace FCUAutoDesign
             if (plan.cooling_index_w_per_square_meter.HasValue)
                 TxtCoolingIndex.Text = plan.cooling_index_w_per_square_meter.Value
                     .ToString("0.##", CultureInfo.CurrentCulture);
+            if (plan.door_offset_mm.HasValue)
+                TxtDoorOffset.Text = plan.door_offset_mm.Value
+                    .ToString("0.##", CultureInfo.CurrentCulture);
+            if (plan.fcu_elevation_mm.HasValue)
+                TxtFcuElevation.Text = plan.fcu_elevation_mm.Value
+                    .ToString("0.##", CultureInfo.CurrentCulture);
+            if (plan.enable_multiple_fcus.HasValue)
+                ChkMultipleFcus.IsChecked = plan.enable_multiple_fcus.Value;
+            if (plan.enable_automatic_scope_discovery.HasValue)
+                ChkAutomaticScope.IsChecked = plan.enable_automatic_scope_discovery.Value;
+            if (plan.connect_return.HasValue)
+                ChkEnableReturn.IsChecked = plan.connect_return.Value;
+            if (plan.connect_condensate.HasValue)
+                ChkEnableCondensate.IsChecked = plan.connect_condensate.Value;
+            return true;
         }
 
         private static string FormatAgentPlan(AgentPlan plan, AgentPlanMode mode)
@@ -142,6 +174,18 @@ namespace FCUAutoDesign
             if (plan.cooling_index_w_per_square_meter.HasValue)
                 text.AppendLine("冷指标建议：" + plan.cooling_index_w_per_square_meter.Value
                     .ToString("0.##", CultureInfo.CurrentCulture) + " W/m²");
+            if (plan.door_offset_mm.HasValue)
+                text.AppendLine("距门侧墙：" + plan.door_offset_mm.Value
+                    .ToString("0.##", CultureInfo.CurrentCulture) + " mm");
+            if (plan.fcu_elevation_mm.HasValue)
+                text.AppendLine("FCU安装高度：" + plan.fcu_elevation_mm.Value
+                    .ToString("0.##", CultureInfo.CurrentCulture) + " mm");
+            AppendFlag(text, "多台均布", plan.enable_multiple_fcus);
+            AppendFlag(text, "自动选房及主管", plan.enable_automatic_scope_discovery);
+            AppendFlag(text, "连接供水", plan.connect_supply);
+            AppendFlag(text, "连接回水", plan.connect_return);
+            AppendFlag(text, "连接冷凝水", plan.connect_condensate);
+            AppendList(text, "需要澄清", plan.clarifications);
             AppendList(text, "观察", plan.observations);
             AppendList(text, "警告", plan.warnings);
             AppendList(text, "禁止操作", plan.blocked_actions);
@@ -160,6 +204,11 @@ namespace FCUAutoDesign
         {
             if (values == null || values.Count == 0) return;
             text.AppendLine(label + "：" + string.Join("；", values));
+        }
+
+        private static void AppendFlag(StringBuilder text, string label, bool? value)
+        {
+            if (value.HasValue) text.AppendLine(label + "：" + (value.Value ? "是" : "否"));
         }
 
         private void BtnRun_Click(object sender, RoutedEventArgs e)

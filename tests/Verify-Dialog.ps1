@@ -86,16 +86,33 @@ try {
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Automatic discovery accepts configured room keywords'
 
     $plan = New-Object FCUAutoDesign.Agent.AgentPlan
-    $plan.schema_version = 1
+    $plan.schema_version = 2
     $plan.summary = 'Adjust the form only'
     $plan.mode = 'recalculate'
     $plan.room_name_keywords = [System.Collections.Generic.List[string]]@('会议室','办公室')
     $plan.cooling_index_w_per_square_meter = 215
+    $plan.door_offset_mm = 500
+    $plan.fcu_elevation_mm = 2500
+    $plan.enable_multiple_fcus = $true
+    $plan.enable_automatic_scope_discovery = $true
+    $plan.connect_supply = $true
+    $plan.connect_return = $true
+    $plan.connect_condensate = $false
     $applyArguments = [object[]]@($plan.PSObject.BaseObject, [FCUAutoDesign.Agent.AgentPlanMode]::Recalculate)
-    $applyAgentPlan.Invoke($window, $applyArguments)
+    Assert-True ([bool]$applyAgentPlan.Invoke($window, $applyArguments)) 'Unambiguous Agent plan can update the form'
     Assert-True ($window.FindName('RbRecalculate').IsChecked -eq $true) 'Confirmed Agent plan can update operation mode'
     Assert-True ($window.FindName('ChkAutomaticScope').IsChecked -eq $true -and $window.FindName('TxtAutomaticRoomKeywords').Text -eq '会议室;办公室') 'Confirmed Agent plan can update room scope inputs'
     Assert-True ($window.FindName('TxtCoolingIndex').Text -eq '215' -and -not $window.IsConfirmed) 'Agent form update does not execute or confirm the Revit command'
+    Assert-True ($window.FindName('TxtDoorOffset').Text -eq '500' -and $window.FindName('TxtFcuElevation').Text -eq '2500') 'Confirmed Agent plan converts and applies millimeter geometry inputs'
+    Assert-True ($window.FindName('ChkMultipleFcus').IsChecked -eq $true -and $window.FindName('ChkEnableReturn').IsChecked -eq $true -and $window.FindName('ChkEnableCondensate').IsChecked -eq $false) 'Confirmed Agent plan applies distribution and pipe intent'
+
+    $clarificationPlan = New-Object FCUAutoDesign.Agent.AgentPlan
+    $clarificationPlan.schema_version = 2
+    $clarificationPlan.summary = 'Ambiguous units'
+    $clarificationPlan.mode = 'create'
+    $clarificationPlan.clarifications = [System.Collections.Generic.List[string]]@('500m or 500mm?')
+    $clarificationArguments = [object[]]@($clarificationPlan.PSObject.BaseObject, [FCUAutoDesign.Agent.AgentPlanMode]::Create)
+    Assert-True (-not [bool]$applyAgentPlan.Invoke($window, $clarificationArguments)) 'Plan requiring clarification cannot update the form'
 } finally { $window.Close() }
 $window = New-TestWindow
 $window.Add_ContentRendered({

@@ -64,7 +64,7 @@ namespace FCUAutoDesign
             BtnAgentPlan.IsEnabled = false;
             pendingAgentPlan = null;
             BtnApplyAgentPlan.Visibility = Visibility.Collapsed;
-            TxtAgentStatus.Text = "正在生成只读建议…";
+            TxtAgentStatus.Text = "正在生成方案…";
             try
             {
                 AgentRequestContext context = new AgentRequestContext

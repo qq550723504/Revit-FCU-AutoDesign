@@ -26,11 +26,11 @@
                 <StackPanel>
                     <Border BorderBrush="#0e7490" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,14" Background="#13263a">
                         <StackPanel>
-                            <TextBlock Text="Agent 只读方案助手" Foreground="#67e8f9" FontWeight="Bold" FontSize="12"/>
-                            <TextBlock Text="描述目标后生成建议。Agent 不能选择模型元素或修改 Revit；确认后仅回填模式、房间关键词和冷指标。" TextWrapping="Wrap" Foreground="#94a3b8" FontSize="11" Margin="0,3,0,7"/>
+                            <TextBlock Text="AI 方案助手" Foreground="#67e8f9" FontWeight="Bold" FontSize="12"/>
+                            <TextBlock Text="用自然语言生成参数方案。AI 不直接选择模型元素或写入 Revit；应用后只回填当前表单，点击“开始放置与接管”才执行。" TextWrapping="Wrap" Foreground="#94a3b8" FontSize="11" Margin="0,3,0,7"/>
                             <TextBox x:Name="TxtAgentRequest" MinHeight="54" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxLength="4000" Background="#0f172a" Foreground="#e2e8f0" BorderBrush="#475569" Padding="5"/>
                             <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
-                                <Button x:Name="BtnAgentPlan" Content="生成只读建议" Width="110" Height="28" Background="#0e7490" Foreground="White" BorderThickness="0" Click="BtnAgentPlan_Click"/>
+                                <Button x:Name="BtnAgentPlan" Content="生成方案" Width="110" Height="28" Background="#0e7490" Foreground="White" BorderThickness="0" Click="BtnAgentPlan_Click"/>
                                 <Button x:Name="BtnApplyAgentPlan" Content="应用建议" Width="80" Height="28" Margin="8,0,0,0" Visibility="Collapsed" Background="#15803d" Foreground="White" BorderThickness="0" Click="BtnApplyAgentPlan_Click"/>
                                 <TextBlock x:Name="TxtAgentStatus" Text="尚未生成" VerticalAlignment="Center" Foreground="#94a3b8" FontSize="11" Margin="10,0,0,0" TextWrapping="Wrap"/>
                             </StackPanel>

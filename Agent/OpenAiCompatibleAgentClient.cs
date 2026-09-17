@@ -99,14 +99,14 @@ namespace FCUAutoDesign.Agent
                         Status = AgentCallStatus.InvalidResponse,
                         Plan = plan,
                         Validation = validation,
-                        Message = "Agent 计划未通过本地只读契约校验：" + string.Join("；", validation.Errors)
+                        Message = "AI 方案未通过本地安全契约校验：" + string.Join("；", validation.Errors)
                     };
                 return new AgentCallResult
                 {
                     Status = AgentCallStatus.Success,
                     Plan = plan,
                     Validation = validation,
-                    Message = "Agent 只读计划已生成；尚未应用到 Revit。"
+                    Message = "AI 方案已生成；尚未应用到当前表单。"
                 };
             }
             catch (InvalidOperationException)

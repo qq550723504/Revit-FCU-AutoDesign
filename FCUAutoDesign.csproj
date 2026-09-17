@@ -63,6 +63,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CmdPlaceFCUAndConnect.cs" />
+    <Compile Include="Agent\AgentContracts.cs" />
+    <Compile Include="Agent\AgentPlanValidator.cs" />
+    <Compile Include="Agent\AgentPromptBuilder.cs" />
+    <Compile Include="Agent\OpenAiCompatibleAgentClient.cs" />
     <Compile Include="Models\TeeConnectionResult.cs" />
     <Compile Include="Models\FCUConnectors.cs" />
     <Compile Include="Models\ExecutionOutcome.cs" />

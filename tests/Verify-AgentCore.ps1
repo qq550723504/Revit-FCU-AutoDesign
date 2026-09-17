@@ -69,6 +69,28 @@ namespace FCUAutoDesign.Agent
 
         public static void Run()
         {
+            string originalBaseUrl = Environment.GetEnvironmentVariable("FCU_AGENT_BASE_URL");
+            string originalModel = Environment.GetEnvironmentVariable("FCU_AGENT_MODEL");
+            string originalApiKey = Environment.GetEnvironmentVariable("FCU_AGENT_API_KEY");
+            try
+            {
+                Environment.SetEnvironmentVariable("FCU_AGENT_BASE_URL", null);
+                Environment.SetEnvironmentVariable("FCU_AGENT_MODEL", null);
+                Environment.SetEnvironmentVariable("FCU_AGENT_API_KEY", null);
+                AgentConfiguration defaults = AgentConfiguration.FromEnvironment();
+                Check(defaults.BaseUrl == AgentConfiguration.DefaultBaseUrl,
+                    "Aliyun workspace compatible endpoint is the default base URL");
+                Check(string.IsNullOrWhiteSpace(defaults.Model)
+                    && string.IsNullOrWhiteSpace(defaults.ApiKey),
+                    "Default configuration keeps model and API key empty");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("FCU_AGENT_BASE_URL", originalBaseUrl);
+                Environment.SetEnvironmentVariable("FCU_AGENT_MODEL", originalModel);
+                Environment.SetEnvironmentVariable("FCU_AGENT_API_KEY", originalApiKey);
+            }
+
             var blankHandler = new FakeHandler { ResponseBody = Response("diagnose", null) };
             using (var blank = new OpenAiCompatibleAgentClient(new AgentConfiguration(), blankHandler))
             {

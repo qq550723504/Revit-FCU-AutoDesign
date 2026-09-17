@@ -20,15 +20,21 @@ namespace FCUAutoDesign.Agent
 
     public sealed class AgentConfiguration
     {
+        public const string DefaultBaseUrl =
+            "https://ws-fdp0ta8nlc7o4157.cn-beijing.maas.aliyuncs.com/compatible-mode/v1";
+
         public string BaseUrl { get; set; }
         public string Model { get; set; }
         public string ApiKey { get; set; }
 
         public static AgentConfiguration FromEnvironment()
         {
+            string configuredBaseUrl = Environment.GetEnvironmentVariable("FCU_AGENT_BASE_URL");
             return new AgentConfiguration
             {
-                BaseUrl = Environment.GetEnvironmentVariable("FCU_AGENT_BASE_URL"),
+                BaseUrl = string.IsNullOrWhiteSpace(configuredBaseUrl)
+                    ? DefaultBaseUrl
+                    : configuredBaseUrl,
                 Model = Environment.GetEnvironmentVariable("FCU_AGENT_MODEL"),
                 ApiKey = Environment.GetEnvironmentVariable("FCU_AGENT_API_KEY")
             };

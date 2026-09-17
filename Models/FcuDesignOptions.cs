@@ -2,8 +2,15 @@
 
 namespace FCUAutoDesign
 {
+    public enum FcuOperationMode
+    {
+        Create,
+        Recalculate
+    }
+
     internal class FcuDesignOptions
     {
+        public FcuOperationMode OperationMode { get; set; }
         public int SelectedFcuTypeId { get; set; }
         public bool EnableMultipleFcus { get; set; }
         public double DoorOffsetMm { get; set; }

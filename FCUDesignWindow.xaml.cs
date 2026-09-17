@@ -21,6 +21,7 @@ namespace FCUAutoDesign
         public bool BreakCurveAndTee { get; private set; } = true;
         public bool EnableAutomaticScopeDiscovery { get; private set; } = false;
         public IList<string> AutomaticRoomNameKeywords { get; private set; } = new List<string>();
+        public FcuOperationMode OperationMode { get; private set; } = FcuOperationMode.Create;
         public bool IsConfirmed { get; private set; } = false;
         public int? SelectedFcuTypeId => FcuTypePicker.SelectedValue as int?;
 
@@ -50,6 +51,8 @@ namespace FCUAutoDesign
             EnableCondensate = ChkEnableCondensate.IsChecked == true;
             BreakCurveAndTee = ChkBreakCurve.IsChecked == true;
             EnableAutomaticScopeDiscovery = ChkAutomaticScope.IsChecked == true;
+            OperationMode = RbRecalculate.IsChecked == true
+                ? FcuOperationMode.Recalculate : FcuOperationMode.Create;
 
             IsConfirmed = true;
             DialogResult = true;

@@ -44,6 +44,7 @@ $window = New-TestWindow
 try {
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Default parameters accepted'
     Assert-True ($window.FindName('ChkMultipleFcus').IsChecked -eq $true -and $window.EnableMultipleFcus) 'Multi-FCU placement enabled by default'
+    Assert-True ($window.FindName('RbCreate').IsChecked -eq $true -and $window.FindName('RbRecalculate').IsChecked -eq $false) 'Create mode is the explicit default'
     Assert-True ($window.FindName('ChkAutomaticScope').IsChecked -eq $false -and -not $window.EnableAutomaticScopeDiscovery) 'Automatic scope discovery is explicit opt-in'
     Assert-True ($window.FindName('TxtAutomaticRoomKeywords').Text -eq '会议室;办公室') 'Target room keywords have an explicit editable default'
     Assert-True ($window.FindName('ChkAutoDn').IsEnabled -eq $false -and $window.FindName('ChkAutoDn').IsChecked -eq $false -and -not $window.EnableAutoSizing) 'Unconfirmed hydraulic auto-sizing is disabled'
@@ -82,4 +83,11 @@ try {
     $window.FindName('TxtAutomaticRoomKeywords').Text = '会议室;办公室'
     Assert-True ([bool]$readParameters.Invoke($window, @())) 'Automatic discovery accepts configured room keywords'
 } finally { $window.Close() }
+$window = New-TestWindow
+$window.Add_ContentRendered({
+    $this.FindName('RbRecalculate').IsChecked = $true
+    $this.FindName('BtnRun').RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Button]::ClickEvent)))
+})
+$result = $window.ShowDialog()
+Assert-True ($result -eq $true -and $window.OperationMode.ToString() -eq 'Recalculate') 'Recalculation mode reaches confirmed command parameters'
 Write-Output "$script:checks checks passed. Revit geometry/connection tests are NOT_RUN by this script."

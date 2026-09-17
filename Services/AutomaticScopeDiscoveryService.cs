@@ -52,7 +52,8 @@ namespace FCUAutoDesign
     {
         private readonly FcuPlacementService placement = new FcuPlacementService();
 
-        public RoomDiscoveryResult DiscoverRooms(Document doc, View view, IEnumerable<string> nameKeywords)
+        public RoomDiscoveryResult DiscoverRooms(Document doc, View view, IEnumerable<string> nameKeywords,
+            FcuOperationMode mode = FcuOperationMode.Create)
         {
             RoomDiscoveryResult result = new RoomDiscoveryResult();
             if (view == null || view.IsTemplate || view.GenLevel == null)
@@ -67,10 +68,14 @@ namespace FCUAutoDesign
             {
                 string label = (room.Number ?? room.Id.IntegerValue.ToString()) + " " + (room.Name ?? string.Empty);
                 DesignRecordReadResult existing = repository.LoadByRoomUniqueId(room.UniqueId);
-                if (existing.Status == DesignOperationStatus.Succeeded)
-                    result.Rejections.Add(label + "：已有 FCU 设计记录，自动新建批次已跳过；可手动选择进入重算。");
-                else if (existing.Status != DesignOperationStatus.NotFound)
+                bool hasDesign = existing.Status == DesignOperationStatus.Succeeded;
+                if (existing.Status != DesignOperationStatus.Succeeded
+                    && existing.Status != DesignOperationStatus.NotFound)
                     result.Rejections.Add(label + "：设计记录状态异常，未自动处理：" + existing.Message);
+                else if (mode == FcuOperationMode.Create && hasDesign)
+                    result.Rejections.Add(label + "：已有 FCU 设计记录，首次生成模式已跳过。");
+                else if (mode == FcuOperationMode.Recalculate && !hasDesign)
+                    result.Rejections.Add(label + "：没有 FCU 设计记录，修改重算模式已跳过。");
                 else if (room.LevelId != view.GenLevel.Id) result.Rejections.Add(label + "：不在当前视图标高。");
                 else if (room.Location == null || room.Area <= 0) result.Rejections.Add(label + "：未放置或未形成有效封闭面积。");
                 else if (!RoomNameKeywordPolicy.Matches(room.Name, nameKeywords))
@@ -285,7 +290,7 @@ namespace FCUAutoDesign
             foreach (string rejection in discovery.Rejections) details.AppendLine("排除：" + rejection);
             TaskDialog dialog = new TaskDialog("自动发现房间")
             {
-                MainInstruction = "发现 " + discovery.Rooms.Count + " 个当前视图同楼层有效房间",
+                MainInstruction = "发现 " + discovery.Rooms.Count + " 个当前视图同楼层有效目标房间",
                 MainContent = "选择“是”使用这些房间；选择“否”改为手动拾取。",
                 ExpandedContent = details.ToString(),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No | TaskDialogCommonButtons.Cancel,

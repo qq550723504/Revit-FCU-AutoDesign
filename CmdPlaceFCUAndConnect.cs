@@ -52,6 +52,7 @@ namespace FCUAutoDesign
 
                 FcuDesignOptions options = new FcuDesignOptions
                 {
+                    OperationMode = uiWindow.OperationMode,
                     SelectedFcuTypeId = uiWindow.SelectedFcuTypeId.Value,
                     DoorOffsetMm = uiWindow.DoorOffsetMm,
                     FcuElevationMm = uiWindow.FcuElevationMm,
@@ -87,7 +88,7 @@ namespace FCUAutoDesign
                 if (options.EnableAutomaticScopeDiscovery)
                 {
                     RoomDiscoveryResult discovered = discoveryService.DiscoverRooms(doc, doc.ActiveView,
-                        options.AutomaticRoomNameKeywords);
+                        options.AutomaticRoomNameKeywords, options.OperationMode);
                     bool? useDiscoveredRooms = discoveryService.ConfirmRooms(discovered);
                     if (!useDiscoveredRooms.HasValue) return Result.Cancelled;
                     if (useDiscoveredRooms.Value)
@@ -132,6 +133,18 @@ namespace FCUAutoDesign
                             throw new InvalidOperationException("所选目标门不属于当前房间。");
                         options.SelectedDoorIds[room.Id.IntegerValue] = selectedDoor.Id;
                     }
+                }
+
+                if (options.OperationMode == FcuOperationMode.Recalculate)
+                {
+                    ReconciliationPreviewOutcome recalculation =
+                        new DesignReconciliationPreviewService().ShowIfExisting(doc, rooms, options);
+                    if (recalculation == ReconciliationPreviewOutcome.Applied)
+                        return Result.Succeeded;
+                    if (recalculation == ReconciliationPreviewOutcome.NotHandled)
+                        TaskDialog.Show("没有可重算设计",
+                            "所选房间没有插件设计记录。本次未放置设备、未选择主管、未修改模型。");
+                    return Result.Cancelled;
                 }
 
                 PipeDiscoveryResult supplyDiscovery = null, returnDiscovery = null, drainDiscovery = null;

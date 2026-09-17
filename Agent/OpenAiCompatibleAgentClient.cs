@@ -138,6 +138,11 @@ namespace FCUAutoDesign.Agent
                 error = "远程 Agent 接口必须使用 HTTPS。";
                 return false;
             }
+            if (!loopback && string.IsNullOrWhiteSpace(value.ApiKey))
+            {
+                error = "远程 Agent 接口尚未配置 API Key；未发送网络请求。";
+                return false;
+            }
             string absolute = baseUri.AbsoluteUri.TrimEnd('/');
             endpoint = new Uri(absolute.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)
                 ? absolute : absolute + "/chat/completions");

@@ -80,9 +80,9 @@ namespace FCUAutoDesign.Agent
                 AgentConfiguration defaults = AgentConfiguration.FromEnvironment();
                 Check(defaults.BaseUrl == AgentConfiguration.DefaultBaseUrl,
                     "Aliyun workspace compatible endpoint is the default base URL");
-                Check(string.IsNullOrWhiteSpace(defaults.Model)
+                Check(defaults.Model == "qwen3.8-max"
                     && string.IsNullOrWhiteSpace(defaults.ApiKey),
-                    "Default configuration keeps model and API key empty");
+                    "Latest Qwen flagship alias is default while API key stays empty");
             }
             finally
             {
@@ -152,6 +152,19 @@ namespace FCUAutoDesign.Agent
                     .GetAwaiter().GetResult();
                 Check(result.Status == AgentCallStatus.Unavailable && !insecureHandler.Called,
                     "Remote plaintext HTTP is rejected before transport");
+            }
+
+            var unauthenticatedHandler = new FakeHandler { ResponseBody = Response("diagnose", null) };
+            using (var unauthenticated = new OpenAiCompatibleAgentClient(new AgentConfiguration
+            {
+                BaseUrl = AgentConfiguration.DefaultBaseUrl,
+                Model = AgentConfiguration.DefaultModel
+            }, unauthenticatedHandler))
+            {
+                var result = unauthenticated.CreatePlanAsync(new AgentRequestContext(), CancellationToken.None)
+                    .GetAwaiter().GetResult();
+                Check(result.Status == AgentCallStatus.Unavailable && !unauthenticatedHandler.Called,
+                    "Remote endpoint without API key never sends a network request");
             }
 
             var duplicate = new AgentPlan

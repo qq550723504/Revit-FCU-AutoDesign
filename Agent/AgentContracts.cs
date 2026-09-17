@@ -22,6 +22,7 @@ namespace FCUAutoDesign.Agent
     {
         public const string DefaultBaseUrl =
             "https://ws-fdp0ta8nlc7o4157.cn-beijing.maas.aliyuncs.com/compatible-mode/v1";
+        public const string DefaultModel = "qwen3.8-max";
 
         public string BaseUrl { get; set; }
         public string Model { get; set; }
@@ -30,12 +31,15 @@ namespace FCUAutoDesign.Agent
         public static AgentConfiguration FromEnvironment()
         {
             string configuredBaseUrl = Environment.GetEnvironmentVariable("FCU_AGENT_BASE_URL");
+            string configuredModel = Environment.GetEnvironmentVariable("FCU_AGENT_MODEL");
             return new AgentConfiguration
             {
                 BaseUrl = string.IsNullOrWhiteSpace(configuredBaseUrl)
                     ? DefaultBaseUrl
                     : configuredBaseUrl,
-                Model = Environment.GetEnvironmentVariable("FCU_AGENT_MODEL"),
+                Model = string.IsNullOrWhiteSpace(configuredModel)
+                    ? DefaultModel
+                    : configuredModel,
                 ApiKey = Environment.GetEnvironmentVariable("FCU_AGENT_API_KEY")
             };
         }

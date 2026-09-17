@@ -105,7 +105,7 @@ namespace FCUAutoDesign
 
             bool canApply = newRooms.Count == 0 && sessions.Count > 0
                 && sessions.All(x => x.ApplyDecision.CanApplyRecordOnly);
-            TaskDialog dialog = new TaskDialog(canApply ? "FCU-205 计算记录更新" : "FCU-205 只读重算预览")
+            TaskDialog dialog = new TaskDialog(canApply ? "FCU 计算记录更新" : "FCU 修改重算预览")
             {
                 MainInstruction = canApply
                     ? "仅检测到冷指标或设计负荷变化，是否更新设计记录？"
@@ -127,7 +127,7 @@ namespace FCUAutoDesign
                 return ReconciliationPreviewOutcome.PreviewOnly;
 
             ApplyCalculationRecords(doc, repository, sessions, options);
-            TaskDialog.Show("FCU-205 更新完成", "已更新 " + sessions.Count
+            TaskDialog.Show("FCU 计算记录更新完成", "已更新 " + sessions.Count
                 + " 个房间的计算记录。未移动或替换设备，未修改任何管线和管径。");
             return ReconciliationPreviewOutcome.Applied;
         }
@@ -146,7 +146,7 @@ namespace FCUAutoDesign
                         + " 的模型在预览后已变化，请重新执行重算。");
             }
 
-            using (TransactionGroup group = new TransactionGroup(doc, "FCU-205 更新计算设计记录"))
+            using (TransactionGroup group = new TransactionGroup(doc, "更新 FCU 计算设计记录"))
             {
                 group.Start();
                 try

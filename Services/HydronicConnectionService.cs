@@ -65,7 +65,7 @@ namespace FCUAutoDesign
             Curve mainCurve = mainLocCurve.Curve;
             if (!(mainCurve is Line) || !mainCurve.IsBound
                 || Math.Abs(mainCurve.GetEndPoint(0).Z - mainCurve.GetEndPoint(1).Z) > MM_TO_FEET)
-                throw new InvalidOperationException("当前 PoC 只支持水平直线主管。");
+                throw new InvalidOperationException("当前验证版只支持水平直线主管。");
             IntersectionResult projectRes = mainCurve.Project(new XYZ(approachEnd.X, approachEnd.Y, approachEnd.Z));
             if (projectRes == null)
             {

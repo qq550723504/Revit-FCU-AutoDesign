@@ -48,7 +48,7 @@ namespace FCUAutoDesign
             string request = (TxtAgentRequest.Text ?? string.Empty).Trim();
             if (request.Length == 0)
             {
-                MessageBox.Show(this, "请先描述希望 Agent 分析或调整的内容。", "Agent 请求为空");
+                MessageBox.Show(this, "请先描述希望 AI 分析或调整的内容。", "AI 请求为空");
                 return;
             }
 
@@ -57,14 +57,14 @@ namespace FCUAutoDesign
                 || !TryPositive(TxtDoorOffset.Text, out doorOffset)
                 || !TryPositive(TxtFcuElevation.Text, out fcuElevation))
             {
-                MessageBox.Show(this, "请先填写有效的冷指标、距墙距离和安装高度。", "Agent 上下文无效");
+                MessageBox.Show(this, "请先填写有效的冷指标、距墙距离和安装高度。", "AI 上下文无效");
                 return;
             }
 
             BtnAgentPlan.IsEnabled = false;
             pendingAgentPlan = null;
             BtnApplyAgentPlan.Visibility = Visibility.Collapsed;
-            TxtAgentStatus.Text = "正在生成只读建议…";
+            TxtAgentStatus.Text = "正在生成方案…";
             try
             {
                 AgentRequestContext context = new AgentRequestContext
@@ -90,32 +90,34 @@ namespace FCUAutoDesign
 
                 if (result.Status != AgentCallStatus.Success || result.Plan == null)
                 {
-                    TxtAgentStatus.Text = "未生成建议";
-                    MessageBox.Show(this, result.Message ?? "Agent 未返回有效建议。", "Agent 不可用");
+                    TxtAgentStatus.Text = "未生成方案";
+                    MessageBox.Show(this, result.Message ?? "AI 未返回有效方案。", "AI 不可用");
                     return;
                 }
 
                 string preview = FormatAgentPlan(result.Plan, result.Validation.Mode);
                 TxtAgentPreview.Text = preview;
                 TxtAgentPreview.Visibility = Visibility.Visible;
-                TxtAgentStatus.Text = "建议已通过本地契约校验";
+                TxtAgentStatus.Text = "方案已通过本地契约校验";
                 if (result.Validation.RequiresClarification)
                 {
-                    TxtAgentStatus.Text = "需要先确认指令歧义，未回填";
-                    MessageBox.Show(this, preview + Environment.NewLine + Environment.NewLine
-                        + "请根据澄清项修改指令后重新生成。当前建议不会回填。",
-                        "Agent 需要澄清", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    TxtAgentStatus.Text = "请根据预览中的澄清项修改指令，当前方案未回填";
+                    return;
+                }
+                if (result.Validation.Mode == AgentPlanMode.Diagnose)
+                {
+                    TxtAgentStatus.Text = "诊断完成，无需回填表单";
                     return;
                 }
                 pendingAgentPlan = result.Plan;
                 pendingAgentMode = result.Validation.Mode;
                 BtnApplyAgentPlan.Visibility = Visibility.Visible;
-                TxtAgentStatus.Text = "请检查建议后点击“应用建议”";
+                TxtAgentStatus.Text = "请检查方案后点击“应用方案”";
             }
             catch (Exception ex)
             {
                 TxtAgentStatus.Text = "生成失败";
-                MessageBox.Show(this, "Agent 调用失败：" + ex.Message, "Agent 错误");
+                MessageBox.Show(this, "AI 调用失败：" + ex.Message, "AI 错误");
             }
             finally
             {
@@ -133,7 +135,8 @@ namespace FCUAutoDesign
 
         private bool ApplyAgentPlan(AgentPlan plan, AgentPlanMode mode)
         {
-            if (plan == null || (plan.clarifications != null && plan.clarifications.Count > 0))
+            if (plan == null || mode == AgentPlanMode.Diagnose
+                || (plan.clarifications != null && plan.clarifications.Count > 0))
                 return false;
             if (mode == AgentPlanMode.Create) RbCreate.IsChecked = true;
             else if (mode == AgentPlanMode.Recalculate) RbRecalculate.IsChecked = true;

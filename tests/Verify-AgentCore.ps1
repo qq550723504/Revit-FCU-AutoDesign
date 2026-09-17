@@ -138,10 +138,16 @@ namespace FCUAutoDesign.Agent
             string systemPrompt = promptBuilder.SystemPrompt();
             string runtimePrompt = promptBuilder.UserPrompt(new AgentRequestContext());
             Check(!systemPrompt.Contains("500m") && !systemPrompt.Contains("2.5m")
-                && !systemPrompt.Contains("enable_multiple_fcus"),
+                && !systemPrompt.Contains("enable_multiple_fcus")
+                && systemPrompt.Contains("execution_contract")
+                && systemPrompt.Contains("Revit")
+                && systemPrompt.Contains("JSON"),
                 "System prompt contains stable role constraints rather than phrase-specific business rules");
             Check(runtimePrompt.Contains("execution_contract")
                 && runtimePrompt.Contains("allowed_form_updates")
+                && runtimePrompt.Contains("mode_policy")
+                && runtimePrompt.Contains("unchanged_values")
+                && runtimePrompt.Contains("clarification_policy")
                 && runtimePrompt.Contains("request_context"),
                 "Runtime prompt carries capabilities, policy and current state as data");
 
@@ -210,6 +216,14 @@ namespace FCUAutoDesign.Agent
             };
             Check(!new AgentPlanValidator().Validate(duplicate).IsValid,
                 "Duplicate plan values are rejected deterministically");
+
+            var diagnosticMutation = new AgentPlan
+            {
+                schema_version = 2, summary = "diagnosis", mode = "diagnose",
+                cooling_index_w_per_square_meter = 200
+            };
+            Check(!new AgentPlanValidator().Validate(diagnosticMutation).IsValid,
+                "Diagnostic plans cannot carry form mutations");
 
             var impossibleUnit = new AgentPlan
             {

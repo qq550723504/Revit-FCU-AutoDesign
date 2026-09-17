@@ -23,9 +23,9 @@ namespace FCUAutoDesign
             DesignRecordRepository repository = new DesignRecordRepository(doc);
             DesignRecordReadResult existing = repository.LoadByRoomUniqueId(room.UniqueId);
             if (existing.Status == DesignOperationStatus.Succeeded)
-                throw new InvalidOperationException("该房间已有插件设计记录。当前版本尚未启用安全重算，为避免重复放置已停止执行。"
+                throw new InvalidOperationException("该房间已有插件设计记录。首次生成模式不允许重复放置，已停止执行。"
                     + Environment.NewLine + "DesignId: " + existing.Record.Identity.DesignId
-                    + Environment.NewLine + "请等待 FCU-205 重算接入，或在模型副本中使用未登记房间测试。");
+                    + Environment.NewLine + "请切换到“修改重算”查看差异；当前重算只允许更新计算记录，不会重建设备或管线。");
             if (existing.Status != DesignOperationStatus.NotFound)
                 throw new InvalidOperationException("读取房间设计记录失败，未修改模型：" + existing.Message);
             string designId = Guid.NewGuid().ToString("N");
@@ -113,10 +113,10 @@ namespace FCUAutoDesign
             XYZ expectedOutletDirection = null;
             FcuDesignResult designResult = null;
 
-            using (TransactionGroup group = new TransactionGroup(doc, "FCU PoC 验证"))
+            using (TransactionGroup group = new TransactionGroup(doc, "FCU 布置与接管"))
             {
                 group.Start();
-                using (Transaction trans = new Transaction(doc, "FCU 智能布设与下翻绕管闭环"))
+                using (Transaction trans = new Transaction(doc, "创建 FCU 与连接支管"))
                 {
                     trans.Start();
                     // 保留警告供用户查看；提交遇到错误时回滚，避免进入待决状态后报成功。
@@ -232,7 +232,7 @@ namespace FCUAutoDesign
                     || committedLocation.Point.DistanceTo(outcome.PlacementPoint) > MM_TO_FEET
                     || (supplyResult != null && !verifier.VerifyConnectionChain(doc, supplyResult))
                     || (returnResult != null && !verifier.VerifyConnectionChain(doc, returnResult)))
-                    throw new InvalidOperationException("提交后位置或连接链复核失败，已回滚整次 PoC 操作。");
+                    throw new InvalidOperationException("提交后位置或连接链复核失败，已回滚本次房间操作。");
                 condensate.Verify(doc, drainResult, supplyResult, returnResult);
                 separation.Verify(doc, supplyResult, returnResult);
                 ConnectionInstallationVerifier.Verify(doc, supplyResult);
@@ -255,7 +255,7 @@ namespace FCUAutoDesign
                     PersistRecord(doc, room, designResult, options, designId);
                 }
                 if (group.Assimilate() != TransactionStatus.Committed)
-                    throw new InvalidOperationException("PoC 事务组未成功提交。");
+                    throw new InvalidOperationException("FCU 房间事务组未成功提交。");
             }
 
             return designResult;

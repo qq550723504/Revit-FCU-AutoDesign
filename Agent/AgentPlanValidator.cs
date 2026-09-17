@@ -14,13 +14,13 @@ namespace FCUAutoDesign.Agent
             AgentPlanValidationResult result = new AgentPlanValidationResult();
             if (plan == null)
             {
-                result.Errors.Add("Agent 未返回计划对象。");
+                result.Errors.Add("AI 未返回方案对象。");
                 return result;
             }
-            if (plan.schema_version != 2) result.Errors.Add("不支持的 Agent 计划版本。");
+            if (plan.schema_version != 2) result.Errors.Add("不支持的 AI 方案版本。");
             AgentPlanMode mode;
             if (!Enum.TryParse(plan.mode ?? string.Empty, true, out mode))
-                result.Errors.Add("Agent 计划模式必须是 diagnose、create 或 recalculate。");
+                result.Errors.Add("AI 方案模式必须是 diagnose、create 或 recalculate。");
             else result.Mode = mode;
             ValidateText(plan.summary, "summary", true, result);
             ValidateList(plan.room_name_keywords, "room_name_keywords", 20, 40, result);
@@ -41,10 +41,25 @@ namespace FCUAutoDesign.Agent
             if (plan.enable_automatic_scope_discovery == true
                 && (plan.room_name_keywords == null || plan.room_name_keywords.Count == 0))
                 result.Errors.Add("启用自动选房时必须提供房间名称关键词。");
+            if (mode == AgentPlanMode.Diagnose && HasFormUpdates(plan))
+                result.Errors.Add("仅诊断模式不得包含表单修改。");
             if (mode != AgentPlanMode.Diagnose && plan.connect_supply == false)
                 result.Errors.Add("现有生成与重算流程必须连接供水主管。");
             result.IsValid = result.Errors.Count == 0;
             return result;
+        }
+
+        private static bool HasFormUpdates(AgentPlan plan)
+        {
+            return (plan.room_name_keywords != null && plan.room_name_keywords.Count > 0)
+                || plan.cooling_index_w_per_square_meter.HasValue
+                || plan.door_offset_mm.HasValue
+                || plan.fcu_elevation_mm.HasValue
+                || plan.enable_multiple_fcus.HasValue
+                || plan.enable_automatic_scope_discovery.HasValue
+                || plan.connect_supply.HasValue
+                || plan.connect_return.HasValue
+                || plan.connect_condensate.HasValue;
         }
 
         private static void ValidateRange(double? value, string field, double minimum,

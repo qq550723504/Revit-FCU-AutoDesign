@@ -26,12 +26,12 @@ namespace FCUAutoDesign
             {
                 if (c.PipeSystemType == PipeSystemType.SupplyHydronic)
                 {
-                    if (result.SupplyConnector != null) throw new InvalidOperationException("FCU 存在多个供水接口，当前 PoC 无法唯一确定接管口。");
+                    if (result.SupplyConnector != null) throw new InvalidOperationException("FCU 存在多个供水接口，当前验证版无法唯一确定接管口。");
                     result.SupplyConnector = c;
                 }
                 else if (c.PipeSystemType == PipeSystemType.ReturnHydronic)
                 {
-                    if (result.ReturnConnector != null) throw new InvalidOperationException("FCU 存在多个回水接口，当前 PoC 无法唯一确定接管口。");
+                    if (result.ReturnConnector != null) throw new InvalidOperationException("FCU 存在多个回水接口，当前验证版无法唯一确定接管口。");
                     result.ReturnConnector = c;
                 }
                 else if (CondensateSystemPolicy.IsCandidate(c.PipeSystemType, condensateType))

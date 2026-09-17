@@ -1,7 +1,7 @@
 ﻿<Window x:Class="FCUAutoDesign.FCUDesignWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FCU 同楼层多房间放置与接管 PoC"
+        Title="FCU 自动布置与接管（验证版）"
         Height="720" Width="520"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -17,7 +17,7 @@
         <!-- 标题区 -->
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
             <TextBlock Text="FCU 同楼层多房间布置" FontSize="16" FontWeight="Bold" Foreground="#38bdf8"/>
-            <TextBlock Text="验证模型位置与连接关系；不含水力计算和碰撞检查" FontSize="11" Foreground="#94a3b8" Margin="0,4,0,0"/>
+            <TextBlock Text="不含正式水力选径、冷凝水坡度和全模型碰撞检查" FontSize="11" Foreground="#94a3b8" Margin="0,4,0,0"/>
         </StackPanel>
 
         <!-- 参数表单 -->
@@ -26,12 +26,12 @@
                 <StackPanel>
                     <Border BorderBrush="#0e7490" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,14" Background="#13263a">
                         <StackPanel>
-                            <TextBlock Text="Agent 只读方案助手" Foreground="#67e8f9" FontWeight="Bold" FontSize="12"/>
-                            <TextBlock Text="描述目标后生成建议。Agent 不能选择模型元素或修改 Revit；确认后仅回填模式、房间关键词和冷指标。" TextWrapping="Wrap" Foreground="#94a3b8" FontSize="11" Margin="0,3,0,7"/>
+                            <TextBlock Text="AI 方案助手" Foreground="#67e8f9" FontWeight="Bold" FontSize="12"/>
+                            <TextBlock Text="用自然语言生成参数方案。AI 不直接选择模型元素或写入 Revit；应用后只回填当前表单，点击“开始放置与接管”才执行。" TextWrapping="Wrap" Foreground="#94a3b8" FontSize="11" Margin="0,3,0,7"/>
                             <TextBox x:Name="TxtAgentRequest" MinHeight="54" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxLength="4000" Background="#0f172a" Foreground="#e2e8f0" BorderBrush="#475569" Padding="5"/>
                             <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
-                                <Button x:Name="BtnAgentPlan" Content="生成只读建议" Width="110" Height="28" Background="#0e7490" Foreground="White" BorderThickness="0" Click="BtnAgentPlan_Click"/>
-                                <Button x:Name="BtnApplyAgentPlan" Content="应用建议" Width="80" Height="28" Margin="8,0,0,0" Visibility="Collapsed" Background="#15803d" Foreground="White" BorderThickness="0" Click="BtnApplyAgentPlan_Click"/>
+                                <Button x:Name="BtnAgentPlan" Content="生成方案" Width="110" Height="28" Background="#0e7490" Foreground="White" BorderThickness="0" Click="BtnAgentPlan_Click"/>
+                                <Button x:Name="BtnApplyAgentPlan" Content="应用方案" Width="80" Height="28" Margin="8,0,0,0" Visibility="Collapsed" Background="#15803d" Foreground="White" BorderThickness="0" Click="BtnApplyAgentPlan_Click"/>
                                 <TextBlock x:Name="TxtAgentStatus" Text="尚未生成" VerticalAlignment="Center" Foreground="#94a3b8" FontSize="11" Margin="10,0,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                             <TextBox x:Name="TxtAgentPreview" IsReadOnly="True" Visibility="Collapsed" MaxHeight="130" Margin="0,7,0,0" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Background="#0f172a" Foreground="#cbd5e1" BorderBrush="#334155" Padding="5"/>
@@ -110,7 +110,7 @@
                                 <TextBox x:Name="TxtAutomaticRoomKeywords" Grid.Column="1" Text="会议室;办公室" Background="#0f172a" Foreground="#67e8f9" BorderBrush="#475569" Padding="4"/>
                             </Grid>
                             <CheckBox x:Name="ChkAutoDn" Content="正式自动选径（等待水力表及匹配依据确认）" IsChecked="False" IsEnabled="False" Foreground="#64748b" Margin="0,3,0,0" FontSize="11"/>
-                            <CheckBox x:Name="ChkBusinessPreview" Content="启用 FCU-201 业务规则预览（确认后继续现有 PoC）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
+                            <CheckBox x:Name="ChkBusinessPreview" Content="启用负荷、台数和点位预览" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
                             <CheckBox x:Name="ChkMultipleFcus" Content="按 L/5 向上取整放置多台（均使用所选族类型）" IsChecked="True" Foreground="#fbbf24" Margin="0,6,0,0" FontSize="11"/>
                             <TextBlock Text="多台沿门侧墙等距布置，任一台接管失败则整间回滚；未自动匹配目录型号，三路支管分别采用设备实际接口尺寸。" TextWrapping="Wrap" Foreground="#94a3b8" FontSize="11"/>
                             <CheckBox x:Name="ChkEnableReturn" Content="连接走廊回水主管" IsChecked="True" Foreground="#c084fc" Margin="0,6,0,0" FontSize="11"/>

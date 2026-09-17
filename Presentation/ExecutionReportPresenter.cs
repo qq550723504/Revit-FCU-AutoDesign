@@ -63,7 +63,7 @@ namespace FCUAutoDesign
 
             TaskDialog dialog = new TaskDialog("FCU 插件执行结果");
             dialog.MainInstruction = outcome.SupplyTeeConnected && enableReturn && returnPicked && outcome.ReturnTeeConnected
-                ? "供回水模型连接链验证通过" : "局部执行完成，双管 PoC 尚未通过";
+                ? "供回水模型连接链验证通过" : "局部执行完成，供回水连接尚未全部通过";
             dialog.MainContent = sb.ToString();
             dialog.Show();
         }

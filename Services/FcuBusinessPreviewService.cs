@@ -43,7 +43,7 @@ namespace FCUAutoDesign
                 RoomRuleSnapshot snapshot = roomReader.Read(doc, room, selectedDoor);
                 if (!snapshot.IsValid)
                 {
-                    TaskDialog.Show("FCU-201 预览无法计算",
+                    TaskDialog.Show("FCU 业务预览无法计算",
                         "房间 " + (room.Number ?? room.Id.IntegerValue.ToString()) + "：" + snapshot.ErrorMessage);
                     return false;
                 }
@@ -63,7 +63,7 @@ namespace FCUAutoDesign
                     }, PreviewCatalog);
                 if (!result.Success)
                 {
-                    TaskDialog.Show("FCU-201 预览无法计算",
+                    TaskDialog.Show("FCU 业务预览无法计算",
                         "房间 " + (room.Number ?? room.Id.IntegerValue.ToString()) + "："
                         + result.ErrorMessage);
                     return false;
